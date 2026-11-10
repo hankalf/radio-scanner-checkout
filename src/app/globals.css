@@ -1,0 +1,22 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  @apply bg-slate-100 text-slate-900 antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dark body {
+  @apply bg-slate-900 text-slate-100;
+}
+
+/* Larger, touch-friendly controls by default (tablet-first). */
+button {
+  touch-action: manipulation;
+}

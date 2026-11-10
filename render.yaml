@@ -1,0 +1,35 @@
+# Render Blueprint — provisions the app + a PostgreSQL database.
+# In Render: New → Blueprint → connect this repo → Apply.
+# https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: safety-knife-checkout
+    runtime: node
+    plan: starter
+    region: oregon
+    # --include=dev ensures build-only tools (TypeScript, Tailwind) are present
+    # even though Render sets NODE_ENV=production.
+    buildCommand: npm ci --include=dev && npm run build
+    # Applies migrations, seeds the fleet, then serves. Render provides PORT.
+    startCommand: npm run start:prod
+    healthCheckPath: /kiosk
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: knife-db
+          property: connectionString
+      - key: NODE_VERSION
+        value: "22"
+      # Timezone for due-date math ("end of today" / "end of Friday").
+      # Change this to the plant's local zone (IANA name) — default UTC is
+      # almost never what you want for shift cut-offs.
+      - key: TZ
+        value: "America/New_York"
+
+databases:
+  - name: knife-db
+    plan: basic-256mb
+    region: oregon
+    databaseName: knifedb
+    user: knife

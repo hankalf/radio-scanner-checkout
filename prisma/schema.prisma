@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// A physical safety knife in the fleet.
+model Knife {
+  id       Int    @id @default(autoincrement())
+  number   String @unique // printed label, e.g. "53"
+  sortKey  Int    // numeric value of `number` for stable ordering
+  status   String @default("AVAILABLE") // AVAILABLE | CHECKED_OUT | DIRTY | CLEANED | DAMAGED | OUT_OF_SERVICE
+  type     String @default("FC") // FC (Food Contact) | NFC (Non-Food Contact)
+  scanCode String? @unique // reserved for future QR/barcode support
+  damageNote String? // set when sanitation flags a knife damaged; cleared on manager return
+  damagePhoto String? // optional data-URL photo captured when flagging damage; cleared with the note
+
+  // current-cycle fields (cleared when the knife returns to AVAILABLE)
+  checkedOutById Int?
+  checkedOutBy   Worker? @relation("KnifeCheckedOutBy", fields: [checkedOutById], references: [id])
+  checkedOutAt   DateTime?
+  dueAt          DateTime?
+
+  retiredAt DateTime?
+
+  events    KnifeEvent[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// A person who acts on knives. Identified by a short PIN (and optional badge).
+model Worker {
+  id       Int     @id @default(autoincrement())
+  name     String
+  pin      String  @unique // short numeric PIN entered on the tablet
+  badgeId  String? @unique
+  roles    String  @default("OPERATOR") // comma-separated: OPERATOR,SANITATION,QA,ADMIN
+  active   Boolean @default(true)
+
+  events         KnifeEvent[]
+  knivesOut      Knife[]      @relation("KnifeCheckedOutBy")
+  createdAt      DateTime     @default(now())
+}
+
+// Immutable audit record — one row per state transition. Never edited or deleted.
+model KnifeEvent {
+  id         Int      @id @default(autoincrement())
+  knifeId    Int
+  knife      Knife    @relation(fields: [knifeId], references: [id])
+  workerId   Int?
+  worker     Worker?  @relation(fields: [workerId], references: [id])
+  action     String   // CHECKOUT | RETURN | CLEAN | QA_PASS | QA_FAIL | RETIRE | RESTORE | ADD
+  fromStatus String?
+  toStatus   String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@index([knifeId])
+  @@index([createdAt])
+}
+
+// Simple key/value configuration store.
+model Setting {
+  key   String @id
+  value String
+}
