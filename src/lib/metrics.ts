@@ -1,15 +1,16 @@
 import { prisma } from "./prisma";
 import { isOverdue } from "./status";
 
-// End-of-day sweep: every knife still checked out, soonest-due first.
+// End-of-shift sweep: every device still checked out, soonest-due first.
 export async function getCheckedOutReport() {
-  const knives = await prisma.knife.findMany({
+  const devices = await prisma.device.findMany({
     where: { status: "CHECKED_OUT" },
     include: { checkedOutBy: { select: { name: true } } },
     orderBy: { dueAt: "asc" },
   });
-  return knives.map((k) => ({
+  return devices.map((k) => ({
     number: k.number,
+    type: k.type,
     holder: k.checkedOutBy?.name ?? "—",
     checkedOutAt: k.checkedOutAt,
     dueAt: k.dueAt,
@@ -19,45 +20,43 @@ export async function getCheckedOutReport() {
 
 export type FleetMetrics = {
   totalCheckouts: number;
-  cleans: number;
+  damageReports: number;
   cyclesMeasured: number;
-  avgTurnaroundMs: number | null; // return -> cleaned & back in service
+  avgTimeOutMs: number | null; // checkout -> check-in
   mostUsed: { number: string; count: number }[];
 };
 
 // Aggregate the immutable event log into fleet-level metrics.
 export async function getMetrics(): Promise<FleetMetrics> {
-  const [events, knives] = await Promise.all([
-    prisma.knifeEvent.findMany({
+  const [events, devices] = await Promise.all([
+    prisma.deviceEvent.findMany({
       orderBy: { createdAt: "asc" },
-      select: { knifeId: true, action: true, createdAt: true },
+      select: { deviceId: true, action: true, createdAt: true },
     }),
-    prisma.knife.findMany({ select: { id: true, number: true } }),
+    prisma.device.findMany({ select: { id: true, number: true } }),
   ]);
-  const numById = new Map(knives.map((k) => [k.id, k.number]));
+  const numById = new Map(devices.map((k) => [k.id, k.number]));
 
   const checkoutCount = new Map<number, number>();
-  let cleans = 0;
-  const lastReturn = new Map<number, Date>();
-  const turnarounds: number[] = [];
+  let damageReports = 0;
+  const lastCheckout = new Map<number, Date>();
+  const timesOut: number[] = [];
 
   for (const e of events) {
     switch (e.action) {
       case "CHECKOUT":
-        checkoutCount.set(e.knifeId, (checkoutCount.get(e.knifeId) ?? 0) + 1);
+        checkoutCount.set(e.deviceId, (checkoutCount.get(e.deviceId) ?? 0) + 1);
+        lastCheckout.set(e.deviceId, e.createdAt);
         break;
-      case "RETURN":
-        // Start of the sanitation turnaround clock for this knife.
-        lastReturn.set(e.knifeId, e.createdAt);
-        break;
-      // CLEAN now completes the cycle (QA_PASS kept for historical events).
-      case "CLEAN":
-      case "QA_PASS": {
-        if (e.action === "CLEAN") cleans++;
-        const r = lastReturn.get(e.knifeId);
-        if (r) {
-          turnarounds.push(e.createdAt.getTime() - r.getTime());
-          lastReturn.delete(e.knifeId);
+      // Either check-in ends the cycle; a damaged return also counts as a report.
+      case "DAMAGE":
+        damageReports++;
+      // falls through
+      case "RETURN": {
+        const c = lastCheckout.get(e.deviceId);
+        if (c) {
+          timesOut.push(e.createdAt.getTime() - c.getTime());
+          lastCheckout.delete(e.deviceId);
         }
         break;
       }
@@ -65,8 +64,8 @@ export async function getMetrics(): Promise<FleetMetrics> {
   }
 
   const totalCheckouts = [...checkoutCount.values()].reduce((a, b) => a + b, 0);
-  const avgTurnaroundMs = turnarounds.length
-    ? turnarounds.reduce((a, b) => a + b, 0) / turnarounds.length
+  const avgTimeOutMs = timesOut.length
+    ? timesOut.reduce((a, b) => a + b, 0) / timesOut.length
     : null;
   const mostUsed = [...checkoutCount.entries()]
     .map(([id, count]) => ({ number: numById.get(id) ?? String(id), count }))
@@ -75,9 +74,9 @@ export async function getMetrics(): Promise<FleetMetrics> {
 
   return {
     totalCheckouts,
-    cleans,
-    cyclesMeasured: turnarounds.length,
-    avgTurnaroundMs,
+    damageReports,
+    cyclesMeasured: timesOut.length,
+    avgTimeOutMs,
     mostUsed,
   };
 }

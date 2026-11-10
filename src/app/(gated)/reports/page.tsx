@@ -36,31 +36,31 @@ export default async function ReportsPage() {
         <MetricCard label="Still checked out" value={String(outstanding)} accent={overdueCount > 0 ? "text-red-600" : undefined} sub={overdueCount > 0 ? `${overdueCount} overdue` : "none overdue"} />
         <MetricCard label="Total checkouts" value={String(metrics.totalCheckouts)} sub="all time" />
         <MetricCard
-          label="Avg turnaround"
-          value={formatDuration(metrics.avgTurnaroundMs)}
-          sub={`${metrics.cyclesMeasured} cleaning cycle${metrics.cyclesMeasured === 1 ? "" : "s"}`}
+          label="Avg time out"
+          value={formatDuration(metrics.avgTimeOutMs)}
+          sub={`${metrics.cyclesMeasured} return${metrics.cyclesMeasured === 1 ? "" : "s"}`}
         />
         <MetricCard
-          label="Cleanings"
-          value={String(metrics.cleans)}
+          label="Damage reports"
+          value={String(metrics.damageReports)}
           sub="all time"
         />
       </div>
 
       {/* End-of-day sweep */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="text-lg font-semibold mb-1">End-of-day sweep</h2>
+        <h2 className="text-lg font-semibold mb-1">End-of-shift sweep</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-          Knives still checked out right now — chase these down before shift close.
+          Radios and scanners still checked out right now — chase these down before shift close.
         </p>
         {sweep.length === 0 ? (
-          <p className="text-emerald-600 text-sm">✓ All knives are accounted for.</p>
+          <p className="text-emerald-600 text-sm">✓ All radios and scanners are accounted for.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-left text-slate-500 dark:text-slate-400 border-b dark:border-slate-700">
                 <tr>
-                  <th className="py-2 pr-4">Knife</th>
+                  <th className="py-2 pr-4">Device</th>
                   <th className="py-2 pr-4">Held by</th>
                   <th className="py-2 pr-4">Since</th>
                   <th className="py-2 pr-4">Due</th>
@@ -70,7 +70,7 @@ export default async function ReportsPage() {
               <tbody>
                 {sweep.map((s) => (
                   <tr key={s.number} className="border-b last:border-0 dark:border-slate-700">
-                    <td className="py-2 pr-4 font-medium">#{s.number}</td>
+                    <td className="py-2 pr-4 font-medium">{s.number}</td>
                     <td className="py-2 pr-4">{s.holder}</td>
                     <td className="py-2 pr-4 text-slate-500 dark:text-slate-400 whitespace-nowrap">
                       {s.checkedOutAt?.toLocaleString() ?? "—"}
@@ -97,11 +97,11 @@ export default async function ReportsPage() {
         )}
       </div>
 
-      {/* Most-used knives */}
+      {/* Most-used devices */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="text-lg font-semibold mb-1">Most-used knives</h2>
+        <h2 className="text-lg font-semibold mb-1">Most-used devices</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-          High counts can flag blades that see the heaviest wear.
+          High counts can flag batteries and units that see the heaviest wear.
         </p>
         {metrics.mostUsed.length === 0 ? (
           <p className="text-slate-400 dark:text-slate-500 text-sm">No checkouts recorded yet.</p>
@@ -111,7 +111,7 @@ export default async function ReportsPage() {
               const max = metrics.mostUsed[0].count || 1;
               return (
                 <li key={m.number} className="flex items-center gap-3">
-                  <span className="w-12 font-medium">#{m.number}</span>
+                  <span className="w-12 font-medium">{m.number}</span>
                   <div className="flex-1 bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden">
                     <div
                       className="bg-sky-500 h-3 rounded-full"

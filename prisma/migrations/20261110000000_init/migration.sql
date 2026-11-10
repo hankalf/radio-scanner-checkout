@@ -1,10 +1,16 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateTable
-CREATE TABLE "Knife" (
+CREATE TABLE "Device" (
     "id" SERIAL NOT NULL,
     "number" TEXT NOT NULL,
     "sortKey" INTEGER NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'AVAILABLE',
+    "type" TEXT NOT NULL DEFAULT 'RADIO',
     "scanCode" TEXT,
+    "damageNote" TEXT,
+    "damagePhoto" TEXT,
     "checkedOutById" INTEGER,
     "checkedOutAt" TIMESTAMP(3),
     "dueAt" TIMESTAMP(3),
@@ -12,7 +18,7 @@ CREATE TABLE "Knife" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Knife_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Device_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -29,9 +35,9 @@ CREATE TABLE "Worker" (
 );
 
 -- CreateTable
-CREATE TABLE "KnifeEvent" (
+CREATE TABLE "DeviceEvent" (
     "id" SERIAL NOT NULL,
-    "knifeId" INTEGER NOT NULL,
+    "deviceId" INTEGER NOT NULL,
     "workerId" INTEGER,
     "action" TEXT NOT NULL,
     "fromStatus" TEXT,
@@ -39,7 +45,7 @@ CREATE TABLE "KnifeEvent" (
     "note" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "KnifeEvent_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "DeviceEvent_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -51,10 +57,10 @@ CREATE TABLE "Setting" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Knife_number_key" ON "Knife"("number");
+CREATE UNIQUE INDEX "Device_number_key" ON "Device"("number");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Knife_scanCode_key" ON "Knife"("scanCode");
+CREATE UNIQUE INDEX "Device_scanCode_key" ON "Device"("scanCode");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Worker_pin_key" ON "Worker"("pin");
@@ -63,16 +69,17 @@ CREATE UNIQUE INDEX "Worker_pin_key" ON "Worker"("pin");
 CREATE UNIQUE INDEX "Worker_badgeId_key" ON "Worker"("badgeId");
 
 -- CreateIndex
-CREATE INDEX "KnifeEvent_knifeId_idx" ON "KnifeEvent"("knifeId");
+CREATE INDEX "DeviceEvent_deviceId_idx" ON "DeviceEvent"("deviceId");
 
 -- CreateIndex
-CREATE INDEX "KnifeEvent_createdAt_idx" ON "KnifeEvent"("createdAt");
+CREATE INDEX "DeviceEvent_createdAt_idx" ON "DeviceEvent"("createdAt");
 
 -- AddForeignKey
-ALTER TABLE "Knife" ADD CONSTRAINT "Knife_checkedOutById_fkey" FOREIGN KEY ("checkedOutById") REFERENCES "Worker"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Device" ADD CONSTRAINT "Device_checkedOutById_fkey" FOREIGN KEY ("checkedOutById") REFERENCES "Worker"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "KnifeEvent" ADD CONSTRAINT "KnifeEvent_knifeId_fkey" FOREIGN KEY ("knifeId") REFERENCES "Knife"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "DeviceEvent" ADD CONSTRAINT "DeviceEvent_deviceId_fkey" FOREIGN KEY ("deviceId") REFERENCES "Device"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "KnifeEvent" ADD CONSTRAINT "KnifeEvent_workerId_fkey" FOREIGN KEY ("workerId") REFERENCES "Worker"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "DeviceEvent" ADD CONSTRAINT "DeviceEvent_workerId_fkey" FOREIGN KEY ("workerId") REFERENCES "Worker"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+

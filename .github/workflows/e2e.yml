@@ -13,9 +13,9 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: knife
-          POSTGRES_PASSWORD: knife
-          POSTGRES_DB: knifedb
+          POSTGRES_USER: device
+          POSTGRES_PASSWORD: device
+          POSTGRES_DB: devicedb
         ports:
           - 5432:5432
         options: >-
@@ -25,7 +25,7 @@ jobs:
           --health-retries 5
 
     env:
-      DATABASE_URL: postgresql://knife:knife@localhost:5432/knifedb?schema=public
+      DATABASE_URL: postgresql://device:device@localhost:5432/devicedb?schema=public
       TZ: America/New_York
       CI: "true"
 

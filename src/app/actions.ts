@@ -10,7 +10,8 @@ import {
   setAdminGate,
   clearAdminGate,
 } from "@/lib/session";
-import { computeDueDate } from "@/lib/schedule";
+import { computeDueDate, parseShiftEnds, formatShiftEnds } from "@/lib/schedule";
+import { getShiftEnds } from "@/lib/data";
 import {
   ROLE,
   STATUS,
@@ -20,6 +21,9 @@ import {
   canManageWorkers,
   canManageTeams,
   canReturnDamaged,
+  TYPE_META,
+  normalizeType,
+  parseDeviceLabel,
   type Role,
 } from "@/lib/status";
 
@@ -53,7 +57,7 @@ export async function logout(): Promise<ActionResult> {
 }
 
 // Verify a PIN specifically to open the admin dashboard. Sets the worker
-// session (for attribution) and a short-lived admin gate. Admin/QA only.
+// session (for attribution) and a short-lived admin gate. Supervisors and admins only.
 export async function unlockAdmin(pin: string): Promise<ActionResult> {
   const clean = (pin || "").trim();
   if (!clean) return fail("Enter your PIN.");
@@ -61,7 +65,7 @@ export async function unlockAdmin(pin: string): Promise<ActionResult> {
   const worker = workers.find((w) => verifyPin(clean, w.pin));
   if (!worker) return fail("PIN not recognized.");
   if (!canAccessAdmin(worker.roles)) {
-    return fail("The admin panel is limited to admins, QA, and managers.");
+    return fail("The admin panel is limited to supervisors and admins.");
   }
   await setCurrentWorker(worker.id);
   await setAdminGate(worker.id);
@@ -82,20 +86,19 @@ async function requireWorkerWithRole(role: Role): Promise<
   return { ok: true, workerId: worker.id, roles: worker.roles };
 }
 
-// Admin panel is open to admins, QA, and managers (managers read-only).
+// Admin panel is open to supervisors and admins.
 async function requirePanelAccess(): Promise<
   { ok: true; workerId: number; roles: string } | { ok: false; error: string }
 > {
   const worker = await getCurrentWorker();
   if (!worker) return { ok: false, error: "Sign in with your PIN first." };
   if (!canAccessAdmin(worker.roles)) {
-    return { ok: false, error: "The admin panel is limited to admins, QA, and managers." };
+    return { ok: false, error: "The admin panel is limited to supervisors and admins." };
   }
   return { ok: true, workerId: worker.id, roles: worker.roles };
 }
 
-// Changing configuration (knives, employees, settings) is admin/QA only —
-// managers get a read-only admin panel.
+// Changing device configuration and kiosk settings: supervisors and admins.
 async function requireConfigAccess(): Promise<
   { ok: true; workerId: number; roles: string } | { ok: false; error: string }
 > {
@@ -104,7 +107,7 @@ async function requireConfigAccess(): Promise<
   if (!canManageConfig(worker.roles)) {
     return {
       ok: false,
-      error: "Managers have read-only access — ask an admin to make this change.",
+      error: "Only a supervisor or admin can make this change.",
     };
   }
   return { ok: true, workerId: worker.id, roles: worker.roles };
@@ -143,11 +146,11 @@ type TransitionOpts = {
   to: string;
   role: Role;
   note?: string;
-  // extra data to write onto the knife
+  // extra data to write onto the device
   data?: Record<string, unknown>;
   // optional extra check (e.g. "only the operator who checked it out may return it")
   guard?: (
-    knife: { checkedOutById: number | null; number: string },
+    device: { checkedOutById: number | null; number: string },
     ctx: GuardContext
   ) => string | null;
 };
@@ -155,7 +158,7 @@ type TransitionOpts = {
 // Core transition, given an already-resolved actor. Used by both the
 // session-based board actions and the PIN-based kiosk actions.
 async function applyTransition(
-  knifeId: number,
+  deviceId: number,
   opts: TransitionOpts,
   actor: Actor,
   // When the caller already authorized the actor (e.g. panel access covers
@@ -167,27 +170,27 @@ async function applyTransition(
   }
   try {
     await prisma.$transaction(async (tx) => {
-      const knife = await tx.knife.findUnique({ where: { id: knifeId } });
-      if (!knife) throw new Error("Knife not found.");
-      if (!opts.from.includes(knife.status)) {
+      const device = await tx.device.findUnique({ where: { id: deviceId } });
+      if (!device) throw new Error("Device not found.");
+      if (!opts.from.includes(device.status)) {
         throw new Error(
-          `Knife #${knife.number} is "${knife.status}" and cannot be ${opts.action}.`
+          `${device.number} is "${device.status}" and cannot be ${opts.action}.`
         );
       }
       if (opts.guard) {
-        const err = opts.guard(knife, actor);
+        const err = opts.guard(device, actor);
         if (err) throw new Error(err);
       }
-      await tx.knife.update({
-        where: { id: knifeId },
+      await tx.device.update({
+        where: { id: deviceId },
         data: { status: opts.to, ...(opts.data ?? {}) },
       });
-      await tx.knifeEvent.create({
+      await tx.deviceEvent.create({
         data: {
-          knifeId,
+          deviceId,
           workerId: actor.workerId,
           action: opts.action,
-          fromStatus: knife.status,
+          fromStatus: device.status,
           toStatus: opts.to,
           note: opts.note ?? null,
         },
@@ -201,13 +204,6 @@ async function applyTransition(
   return ok();
 }
 
-// Session-based transition (main board): actor comes from the signed-in cookie.
-async function transition(knifeId: number, opts: TransitionOpts): Promise<ActionResult> {
-  const auth = await requireWorkerWithRole(opts.role);
-  if (!auth.ok) return fail(auth.error);
-  return applyTransition(knifeId, opts, { workerId: auth.workerId, roles: auth.roles });
-}
-
 // Resolve a worker from a raw PIN (for the shared kiosk, which has no session).
 async function actorFromPin(pin: string): Promise<Actor | null> {
   const clean = (pin || "").trim();
@@ -217,24 +213,32 @@ async function actorFromPin(pin: string): Promise<Actor | null> {
   return worker ? { workerId: worker.id, roles: worker.roles } : null;
 }
 
-type KioskAction = "CHECKOUT" | "RETURN" | "CLEAN";
-
-// Which role each kiosk action needs.
-const ACTION_ROLE: Record<KioskAction, Role> = {
-  CHECKOUT: ROLE.OPERATOR,
-  RETURN: ROLE.OPERATOR,
-  CLEAN: ROLE.SANITATION,
-};
+type KioskAction = "CHECKOUT" | "RETURN";
 
 async function kioskIsLocked(): Promise<boolean> {
   const locked = await prisma.setting.findUnique({ where: { key: "kioskLocked" } });
   return locked?.value === "true";
 }
 
+async function dueDateFromNow(now: Date): Promise<Date> {
+  return computeDueDate(await getShiftEnds(), now);
+}
+
+// Only the operator holding a device may check it in — or a supervisor/admin,
+// who can check in a device left behind by someone else.
+function holderGuard(
+  device: { checkedOutById: number | null; number: string },
+  ctx: GuardContext
+): string | null {
+  return device.checkedOutById === ctx.workerId || canReturnDamaged(ctx.roles)
+    ? null
+    : `${device.number} was checked out by someone else — only they (or a supervisor) can return it.`;
+}
+
 // Step 1 of the kiosk flow: verify the PIN and return who this is, so the
 // worker can confirm their name before the action executes. Nothing changes yet.
 export async function kioskIdentify(
-  knifeId: number,
+  deviceId: number,
   action: KioskAction,
   pin: string
 ): Promise<{ ok: true; name: string; dueAtMs?: number } | { ok: false; error: string }> {
@@ -247,20 +251,26 @@ export async function kioskIdentify(
   const worker = workers.find((w) => verifyPin(clean, w.pin));
   if (!worker) return { ok: false, error: "PIN not recognized." };
 
-  // Check the role fits the action now, so a wrong-role PIN fails at this
-  // step rather than after the worker confirms their name.
-  const role = ACTION_ROLE[action];
-  if (!hasRole(worker.roles, role)) {
-    return { ok: false, error: `This action requires the ${role} role.` };
+  // Check the role (and, for a return, who holds it) now, so a wrong PIN
+  // fails at this step rather than after the worker confirms their name.
+  if (!hasRole(worker.roles, ROLE.OPERATOR)) {
+    return { ok: false, error: "This action requires the OPERATOR role." };
+  }
+  if (action === "RETURN") {
+    const device = await prisma.device.findUnique({
+      where: { id: deviceId },
+      select: { number: true, checkedOutById: true },
+    });
+    if (device) {
+      const err = holderGuard(device, { workerId: worker.id, roles: worker.roles });
+      if (err) return { ok: false, error: err };
+    }
   }
 
-  // For a checkout, tell the confirm screen when the knife will be due back —
+  // For a checkout, tell the confirm screen when the device will be due back —
   // computed server-side so it matches exactly what checkout will stamp.
   if (action === "CHECKOUT") {
-    const knife = await prisma.knife.findUnique({ where: { id: knifeId }, select: { type: true } });
-    if (knife) {
-      return { ok: true, name: worker.name, dueAtMs: computeDueDate(knife.type, new Date()).getTime() };
-    }
+    return { ok: true, name: worker.name, dueAtMs: (await dueDateFromNow(new Date())).getTime() };
   }
   return { ok: true, name: worker.name };
 }
@@ -276,7 +286,7 @@ async function writeKioskLocked(locked: boolean): Promise<void> {
   revalidatePath("/", "layout");
 }
 
-// From the Admin panel (signed-in admin).
+// From the Admin panel (signed-in supervisor/admin).
 export async function setKioskLocked(locked: boolean): Promise<ActionResult> {
   const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
@@ -292,115 +302,69 @@ export async function setKioskLockedWithPin(
   const actor = await actorFromPin(pin);
   if (!actor) return fail("PIN not recognized.");
   if (!canAccessAdmin(actor.roles)) {
-    return fail("Only an admin or QA can lock or unlock the kiosk.");
+    return fail("Only a supervisor or admin can lock or unlock the kiosk.");
   }
   await writeKioskLocked(locked);
   return ok();
 }
 
-// Kiosk operator actions: check out / check in. (Sanitation cleaning goes
-// through kioskClean below because it carries the inspection checklist.)
-// Post a live Teams alert for a kiosk action, if that alert type is enabled.
-async function notifyKioskAction(
-  knifeId: number,
+// Post a live Teams alert for a checkout/check-in, if that alert type is enabled.
+async function notifyAction(
+  deviceId: number,
   workerId: number,
-  kind: "checkout" | "checkin" | "cleaned"
+  kind: "checkout" | "checkin"
 ): Promise<void> {
   const cfg = await getTeamsConfig();
-  const wanted =
-    kind === "checkout" ? cfg.notifyCheckout : kind === "checkin" ? cfg.notifyCheckin : cfg.notifyCleaned;
+  const wanted = kind === "checkout" ? cfg.notifyCheckout : cfg.notifyCheckin;
   if (!cfg.enabled || !wanted || !cfg.webhookUrl) return;
-  const [knife, worker] = await Promise.all([
-    prisma.knife.findUnique({ where: { id: knifeId }, select: { number: true, dueAt: true } }),
+  const [device, worker] = await Promise.all([
+    prisma.device.findUnique({ where: { id: deviceId }, select: { number: true, type: true, dueAt: true } }),
     prisma.worker.findUnique({ where: { id: workerId }, select: { name: true } }),
   ]);
   const who = worker?.name ?? "Someone";
+  const label = device ? `${TYPE_META[normalizeType(device.type)].label} ${device.number}` : "Device";
   const text =
     kind === "checkout"
-      ? `🔪 Knife #${knife?.number} checked out by ${who}${knife?.dueAt ? ` — due back ${knife.dueAt.toLocaleString()}` : ""}.`
-      : kind === "checkin"
-        ? `↩️ Knife #${knife?.number} checked in by ${who} — awaiting sanitation.`
-        : `✅ Knife #${knife?.number} cleaned & returned to service by ${who}.`;
+      ? `📻 ${label} checked out by ${who}${device?.dueAt ? ` — due back ${device.dueAt.toLocaleString()}` : ""}.`
+      : `↩️ ${label} returned by ${who} and placed on the charger.`;
   await postToTeams(cfg.webhookUrl, text);
 }
 
-export async function kioskAct(
-  knifeId: number,
-  action: "CHECKOUT" | "RETURN",
-  pin: string,
-  note?: string
-): Promise<ActionResult> {
-  if (await kioskIsLocked()) return fail("The kiosk is locked. Ask a supervisor to unlock it.");
-  const actor = await actorFromPin(pin);
-  if (!actor) return fail("PIN not recognized.");
-  const trimmed = (note || "").trim() || undefined;
-
-  if (action === "CHECKOUT") {
-    const knife = await prisma.knife.findUnique({ where: { id: knifeId }, select: { type: true } });
-    if (!knife) return fail("Knife not found.");
-    const now = new Date();
-    const due = computeDueDate(knife.type, now);
-    const res = await applyTransition(
-      knifeId,
-      {
-        action: "CHECKOUT",
-        from: [STATUS.AVAILABLE],
-        to: STATUS.CHECKED_OUT,
-        role: ROLE.OPERATOR,
-        data: { checkedOutById: actor.workerId, checkedOutAt: now, dueAt: due },
-        note: trimmed,
-      },
-      actor
-    );
-    if (res.ok) await notifyKioskAction(knifeId, actor.workerId, "checkout");
-    return res;
-  }
-  // RETURN
+async function checkoutAs(deviceId: number, actor: Actor): Promise<ActionResult> {
+  const now = new Date();
+  const due = await dueDateFromNow(now);
   const res = await applyTransition(
-    knifeId,
+    deviceId,
     {
-      action: "RETURN",
-      from: [STATUS.CHECKED_OUT],
-      to: STATUS.DIRTY,
+      action: "CHECKOUT",
+      from: [STATUS.AVAILABLE],
+      to: STATUS.CHECKED_OUT,
       role: ROLE.OPERATOR,
-      data: { checkedOutById: null, checkedOutAt: null, dueAt: null },
-      note: trimmed,
-      guard: (knife, ctx) =>
-        knife.checkedOutById === ctx.workerId || hasRole(ctx.roles, ROLE.ADMIN)
-          ? null
-          : `Knife #${knife.number} was checked out by someone else — only they (or an admin) can return it.`,
+      data: { checkedOutById: actor.workerId, checkedOutAt: now, dueAt: due },
     },
     actor
   );
-  if (res.ok) await notifyKioskAction(knifeId, actor.workerId, "checkin");
+  if (res.ok) await notifyAction(deviceId, actor.workerId, "checkout");
   return res;
 }
 
-export type CleanAnswers = {
-  cleaned: boolean;
-  inspected: boolean;
+export type ReturnAnswers = {
+  onCharger: boolean;
   condition: "GOOD" | "DAMAGED";
   damageReason?: string;
   damagePhoto?: string; // optional data-URL photo (downscaled client-side)
 };
 
-// Sanitation cleaning with the 4-question inspection checklist. A "Good"
-// knife returns to service; a "Damaged" one is held for a manager.
-export async function kioskClean(
-  knifeId: number,
-  pin: string,
-  answers: CleanAnswers
-): Promise<ActionResult> {
-  if (await kioskIsLocked()) return fail("The kiosk is locked. Ask a supervisor to unlock it.");
-  const actor = await actorFromPin(pin);
-  if (!actor) return fail("PIN not recognized.");
-  if (!hasRole(actor.roles, ROLE.SANITATION)) {
-    return fail("This action requires the SANITATION role.");
+// Check-in with the return checklist. A "Good" device goes straight back to
+// Available; a "Damaged" one is held until a supervisor reviews it.
+async function returnAs(deviceId: number, actor: Actor, answers: ReturnAnswers): Promise<ActionResult> {
+  if (!answers.onCharger) {
+    return fail("Put the device on its charger before checking it in. · Ponga el equipo en el cargador.");
   }
-
-  const reason = (answers.damageReason || "").trim();
+  const cleared = { checkedOutById: null, checkedOutAt: null, dueAt: null };
 
   if (answers.condition === "DAMAGED") {
+    const reason = (answers.damageReason || "").trim();
     if (!reason) return fail("Describe the damage before submitting.");
     const photo = (answers.damagePhoto || "").trim();
     if (photo) {
@@ -410,155 +374,116 @@ export async function kioskClean(
       if (photo.length > 1_400_000) return fail("Damage photo is too large.");
     }
     const res = await applyTransition(
-      knifeId,
+      deviceId,
       {
         action: "DAMAGE",
-        from: [STATUS.DIRTY, STATUS.CLEANED],
+        from: [STATUS.CHECKED_OUT],
         to: STATUS.DAMAGED,
-        role: ROLE.SANITATION,
-        data: { damageNote: reason, damagePhoto: photo || null, checkedOutById: null, checkedOutAt: null, dueAt: null },
-        note: `Cleaned: ${answers.cleaned ? "Y" : "N"}, Inspected: ${answers.inspected ? "Y" : "N"}, Condition: Damaged — ${reason}`,
+        role: ROLE.OPERATOR,
+        data: { ...cleared, damageNote: reason, damagePhoto: photo || null },
+        note: `On charger: Y, Condition: Damaged — ${reason}`,
+        guard: holderGuard,
       },
       actor
     );
-    // Live Teams notification so a manager knows a knife needs review.
+    // Live Teams notification so a supervisor knows a device needs review.
     if (res.ok) {
       const cfg = await getTeamsConfig();
       if (cfg.enabled && cfg.notifyDamaged && cfg.webhookUrl) {
-        const knife = await prisma.knife.findUnique({ where: { id: knifeId }, select: { number: true } });
+        const device = await prisma.device.findUnique({ where: { id: deviceId }, select: { number: true, type: true } });
         const worker = await prisma.worker.findUnique({ where: { id: actor.workerId }, select: { name: true } });
+        const label = device ? `${TYPE_META[normalizeType(device.type)].label} ${device.number}` : "A device";
         await postToTeams(
           cfg.webhookUrl,
-          `⚠️ Knife #${knife?.number} flagged **damaged** by ${worker?.name}: ${reason} — needs a manager to review.`
+          `⚠️ ${label} returned **damaged** by ${worker?.name}: ${reason} — needs a supervisor to review.`
         );
       }
     }
     return res;
   }
 
-  // Good: must be cleaned AND inspected to return to service.
-  if (!answers.cleaned || !answers.inspected) {
-    return fail("Knife must be marked cleaned and inspected before returning to service.");
-  }
-  const cleanRes = await applyTransition(
-    knifeId,
+  const res = await applyTransition(
+    deviceId,
     {
-      action: "CLEAN",
-      from: [STATUS.DIRTY, STATUS.CLEANED],
+      action: "RETURN",
+      from: [STATUS.CHECKED_OUT],
       to: STATUS.AVAILABLE,
-      role: ROLE.SANITATION,
-      data: { damageNote: null, damagePhoto: null, checkedOutById: null, checkedOutAt: null, dueAt: null },
-      note: "Cleaned: Y, Inspected: Y, Condition: Good",
+      role: ROLE.OPERATOR,
+      data: { ...cleared, damageNote: null, damagePhoto: null },
+      note: "On charger: Y, Condition: Good",
+      guard: holderGuard,
     },
     actor
   );
-  if (cleanRes.ok) await notifyKioskAction(knifeId, actor.workerId, "cleaned");
-  return cleanRes;
+  if (res.ok) await notifyAction(deviceId, actor.workerId, "checkin");
+  return res;
 }
 
-// Manager (admin) returns a damaged knife to service after review.
-export async function returnDamagedToService(knifeId: number): Promise<ActionResult> {
+// Kiosk checkout (PIN-confirmed).
+export async function kioskCheckout(deviceId: number, pin: string): Promise<ActionResult> {
+  if (await kioskIsLocked()) return fail("The kiosk is locked. Ask a supervisor to unlock it.");
+  const actor = await actorFromPin(pin);
+  if (!actor) return fail("PIN not recognized.");
+  return checkoutAs(deviceId, actor);
+}
+
+// Kiosk check-in with the return checklist (PIN-confirmed).
+export async function kioskReturn(
+  deviceId: number,
+  pin: string,
+  answers: ReturnAnswers
+): Promise<ActionResult> {
+  if (await kioskIsLocked()) return fail("The kiosk is locked. Ask a supervisor to unlock it.");
+  const actor = await actorFromPin(pin);
+  if (!actor) return fail("PIN not recognized.");
+  return returnAs(deviceId, actor, answers);
+}
+
+// Supervisor (or admin) returns a damaged device to service after review.
+export async function returnDamagedToService(deviceId: number): Promise<ActionResult> {
   const worker = await getCurrentWorker();
   if (!worker) return fail("Sign in with your PIN first.");
   if (!canReturnDamaged(worker.roles)) {
-    return fail("Only QA, a manager, or an admin can return a damaged knife to service.");
+    return fail("Only a supervisor or an admin can return a damaged device to service.");
   }
-  const auth = { ok: true as const, workerId: worker.id, roles: worker.roles };
   return applyTransition(
-    knifeId,
+    deviceId,
     {
-      action: "MANAGER_RETURN",
+      action: "SUPERVISOR_RETURN",
       from: [STATUS.DAMAGED],
       to: STATUS.AVAILABLE,
-      role: ROLE.ADMIN,
+      role: ROLE.SUPERVISOR,
       data: { damageNote: null, damagePhoto: null, checkedOutById: null, checkedOutAt: null, dueAt: null },
     },
-    { workerId: auth.workerId, roles: auth.roles },
-    true // already authorized above (manager or admin)
+    { workerId: worker.id, roles: worker.roles },
+    true // already authorized above
   );
 }
 
-// ---- Lifecycle actions ----------------------------------------------------
+// ---- Lifecycle actions (fleet board, signed-in session) --------------------
 
-export async function checkoutKnife(knifeId: number): Promise<ActionResult> {
+export async function checkoutDevice(deviceId: number): Promise<ActionResult> {
   const auth = await requireWorkerWithRole(ROLE.OPERATOR);
   if (!auth.ok) return fail(auth.error);
-  const knife = await prisma.knife.findUnique({ where: { id: knifeId }, select: { type: true } });
-  if (!knife) return fail("Knife not found.");
-  const now = new Date();
-  const due = computeDueDate(knife.type, now);
-  return transition(knifeId, {
-    action: "CHECKOUT",
-    from: [STATUS.AVAILABLE],
-    to: STATUS.CHECKED_OUT,
-    role: ROLE.OPERATOR,
-    data: { checkedOutById: auth.workerId, checkedOutAt: now, dueAt: due },
-  });
+  return checkoutAs(deviceId, { workerId: auth.workerId, roles: auth.roles });
 }
 
-export async function returnKnife(knifeId: number): Promise<ActionResult> {
-  return transition(knifeId, {
-    action: "RETURN",
-    from: [STATUS.CHECKED_OUT],
-    to: STATUS.DIRTY,
-    role: ROLE.OPERATOR,
-    data: { checkedOutById: null, checkedOutAt: null, dueAt: null },
-    // Only the operator who holds the knife may return it (admins can override).
-    guard: (knife, ctx) =>
-      knife.checkedOutById === ctx.workerId || hasRole(ctx.roles, ROLE.ADMIN)
-        ? null
-        : `Knife #${knife.number} was checked out by someone else — only they (or an admin) can return it.`,
-  });
+export async function returnDevice(deviceId: number, answers: ReturnAnswers): Promise<ActionResult> {
+  const auth = await requireWorkerWithRole(ROLE.OPERATOR);
+  if (!auth.ok) return fail(auth.error);
+  return returnAs(deviceId, { workerId: auth.workerId, roles: auth.roles }, answers);
 }
 
-// Cleaning returns the knife straight to service — there is no separate QA
-// step. CLEANED is accepted as a source for legacy knives stuck in that state.
-export async function cleanKnife(knifeId: number): Promise<ActionResult> {
-  return transition(knifeId, {
-    action: "CLEAN",
-    from: [STATUS.DIRTY, STATUS.CLEANED],
-    to: STATUS.AVAILABLE,
-    role: ROLE.SANITATION,
-    data: { checkedOutById: null, checkedOutAt: null, dueAt: null },
-  });
-}
-
-// ---- Batch actions (sanitation moves many knives at once) ------------------
-
-export type BatchResult = { ok: boolean; done: number; failed: number; error?: string };
-
-async function runBatch(
-  ids: number[],
-  fn: (id: number) => Promise<ActionResult>
-): Promise<BatchResult> {
-  let done = 0;
-  let failed = 0;
-  let firstError: string | undefined;
-  for (const id of ids) {
-    const res = await fn(id);
-    if (res.ok) done++;
-    else {
-      failed++;
-      if (!firstError) firstError = res.error;
-    }
-  }
-  return { ok: done > 0, done, failed, error: failed > 0 ? firstError : undefined };
-}
-
-export async function batchClean(ids: number[]): Promise<BatchResult> {
-  return runBatch(ids, cleanKnife);
-}
-
-export async function retireKnife(knifeId: number, reason: string): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+export async function retireDevice(deviceId: number, reason: string): Promise<ActionResult> {
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   return applyTransition(
-    knifeId,
+    deviceId,
     {
       action: "RETIRE",
-      from: [STATUS.AVAILABLE, STATUS.CHECKED_OUT, STATUS.DIRTY, STATUS.CLEANED, STATUS.DAMAGED],
+      from: [STATUS.AVAILABLE, STATUS.CHECKED_OUT, STATUS.DAMAGED],
       to: STATUS.OUT_OF_SERVICE,
-      role: ROLE.ADMIN,
+      role: ROLE.SUPERVISOR,
       note: (reason || "").trim() || undefined,
       data: {
         retiredAt: new Date(),
@@ -574,16 +499,16 @@ export async function retireKnife(knifeId: number, reason: string): Promise<Acti
   );
 }
 
-export async function restoreKnife(knifeId: number): Promise<ActionResult> {
-  const auth = await requirePanelAccess();
+export async function restoreDevice(deviceId: number): Promise<ActionResult> {
+  const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   return applyTransition(
-    knifeId,
+    deviceId,
     {
       action: "RESTORE",
       from: [STATUS.OUT_OF_SERVICE],
-      to: STATUS.DIRTY,
-      role: ROLE.ADMIN,
+      to: STATUS.AVAILABLE,
+      role: ROLE.SUPERVISOR,
       data: { retiredAt: null },
     },
     { workerId: auth.workerId, roles: auth.roles },
@@ -593,129 +518,115 @@ export async function restoreKnife(knifeId: number): Promise<ActionResult> {
 
 // ---- Admin: fleet & workers ----------------------------------------------
 
-export async function addKnife(number: string, type: string = "FC"): Promise<ActionResult> {
+export async function addDevice(label: string, type: string = "RADIO"): Promise<ActionResult> {
   const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
-  const label = (number || "").trim();
-  if (!/^\d+$/.test(label)) return fail("Knife number must be a positive whole number.");
-  const sortKey = Number(label);
-  const knifeType = type === "NFC" ? "NFC" : "FC";
+  const deviceType = normalizeType(type);
+  const parsed = parseDeviceLabel(label, deviceType);
+  if (!parsed) return fail("Use a label like R21 or S21 (or just a number).");
 
-  const existing = await prisma.knife.findUnique({ where: { number: label } });
-  if (existing) return fail(`Knife #${label} already exists.`);
+  const existing = await prisma.device.findUnique({ where: { number: parsed.number } });
+  if (existing) return fail(`${parsed.number} already exists.`);
 
   try {
     await prisma.$transaction(async (tx) => {
-      const knife = await tx.knife.create({
-        data: { number: label, sortKey, status: STATUS.AVAILABLE, type: knifeType },
+      const device = await tx.device.create({
+        data: { number: parsed.number, sortKey: parsed.sortKey, status: STATUS.AVAILABLE, type: deviceType },
       });
-      await tx.knifeEvent.create({
+      await tx.deviceEvent.create({
         data: {
-          knifeId: knife.id,
+          deviceId: device.id,
           workerId: auth.workerId,
           action: "ADD",
           fromStatus: null,
           toStatus: STATUS.AVAILABLE,
-          note: `Added to fleet (${knifeType})`,
+          note: `Added to fleet (${TYPE_META[deviceType].label})`,
         },
       });
     });
   } catch {
-    return fail("Could not add knife.");
+    return fail("Could not add device.");
   }
   revalidatePath("/", "layout");
   return ok();
 }
 
-export async function setKnifeType(knifeId: number, type: string): Promise<ActionResult> {
-  const auth = await requireConfigAccess();
-  if (!auth.ok) return fail(auth.error);
-  const knifeType = type === "NFC" ? "NFC" : "FC";
-  try {
-    await prisma.$transaction(async (tx) => {
-      const knife = await tx.knife.findUnique({ where: { id: knifeId } });
-      if (!knife) throw new Error("Knife not found.");
-      if (knife.type === knifeType) return;
-      await tx.knife.update({ where: { id: knifeId }, data: { type: knifeType } });
-      await tx.knifeEvent.create({
-        data: {
-          knifeId,
-          workerId: auth.workerId,
-          action: "RETYPE",
-          fromStatus: knife.status,
-          toStatus: knife.status,
-          note: `Type set to ${knifeType}`,
-        },
-      });
-    });
-  } catch (e) {
-    return fail(e instanceof Error ? e.message : "Could not update type.");
-  }
-  revalidatePath("/", "layout");
-  return ok();
-}
-
-// Edit a knife's number and/or type from the admin panel.
-export async function updateKnifeDetails(
-  knifeId: number,
+// Edit a device's label and/or type from the admin panel.
+export async function updateDeviceDetails(
+  deviceId: number,
   input: { number: string; type: string }
 ): Promise<ActionResult> {
   const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
-  const label = (input.number || "").trim();
-  if (!/^\d+$/.test(label)) return fail("Knife number must be a positive whole number.");
-  const sortKey = Number(label);
-  const knifeType = input.type === "NFC" ? "NFC" : "FC";
+  const deviceType = normalizeType(input.type);
+  const parsed = parseDeviceLabel(input.number, deviceType);
+  if (!parsed) return fail("Use a label like R21 or S21 (or just a number).");
 
   try {
     await prisma.$transaction(async (tx) => {
-      const knife = await tx.knife.findUnique({ where: { id: knifeId } });
-      if (!knife) throw new Error("Knife not found.");
-      if (label !== knife.number) {
-        const clash = await tx.knife.findUnique({ where: { number: label } });
-        if (clash) throw new Error(`Knife #${label} already exists.`);
+      const device = await tx.device.findUnique({ where: { id: deviceId } });
+      if (!device) throw new Error("Device not found.");
+      if (parsed.number !== device.number) {
+        const clash = await tx.device.findUnique({ where: { number: parsed.number } });
+        if (clash) throw new Error(`${parsed.number} already exists.`);
       }
-      if (label === knife.number && knifeType === knife.type) return;
-      await tx.knife.update({
-        where: { id: knifeId },
-        data: { number: label, sortKey, type: knifeType },
+      if (parsed.number === device.number && deviceType === device.type) return;
+      await tx.device.update({
+        where: { id: deviceId },
+        data: { number: parsed.number, sortKey: parsed.sortKey, type: deviceType },
       });
-      await tx.knifeEvent.create({
+      await tx.deviceEvent.create({
         data: {
-          knifeId,
+          deviceId,
           workerId: auth.workerId,
           action: "EDIT",
-          fromStatus: knife.status,
-          toStatus: knife.status,
-          note: `Edited: #${knife.number} (${knife.type}) → #${label} (${knifeType})`,
+          fromStatus: device.status,
+          toStatus: device.status,
+          note: `Edited: ${device.number} (${device.type}) → ${parsed.number} (${deviceType})`,
         },
       });
     });
   } catch (e) {
-    return fail(e instanceof Error ? e.message : "Could not update knife.");
+    return fail(e instanceof Error ? e.message : "Could not update device.");
   }
   revalidatePath("/", "layout");
   return ok();
 }
 
-// Permanently delete a knife and its audit history. For mis-added knives;
-// use Retire to take a real knife out of service while keeping its history.
-export async function deleteKnife(knifeId: number): Promise<ActionResult> {
+// Permanently delete a device and its audit history. For mis-added devices;
+// use Retire to take a real device out of service while keeping its history.
+export async function deleteDevice(deviceId: number): Promise<ActionResult> {
   const auth = await requireConfigAccess();
   if (!auth.ok) return fail(auth.error);
   try {
-    const knife = await prisma.knife.findUnique({ where: { id: knifeId } });
-    if (!knife) return fail("Knife not found.");
-    if (knife.status === STATUS.CHECKED_OUT) {
-      return fail("Return this knife before removing it.");
+    const device = await prisma.device.findUnique({ where: { id: deviceId } });
+    if (!device) return fail("Device not found.");
+    if (device.status === STATUS.CHECKED_OUT) {
+      return fail("Check this device in before removing it.");
     }
     await prisma.$transaction([
-      prisma.knifeEvent.deleteMany({ where: { knifeId } }),
-      prisma.knife.delete({ where: { id: knifeId } }),
+      prisma.deviceEvent.deleteMany({ where: { deviceId } }),
+      prisma.device.delete({ where: { id: deviceId } }),
     ]);
   } catch {
-    return fail("Could not remove knife.");
+    return fail("Could not remove device.");
   }
+  revalidatePath("/", "layout");
+  return ok();
+}
+
+// Shift end times ("07:00, 15:00, 23:00") that set every checkout's due time.
+export async function updateShiftEnds(value: string): Promise<ActionResult> {
+  const auth = await requireConfigAccess();
+  if (!auth.ok) return fail(auth.error);
+  const mins = parseShiftEnds(value);
+  if (mins.length === 0) return fail("Enter at least one time, like 15:00 (24-hour clock).");
+  const clean = formatShiftEnds(mins);
+  await prisma.setting.upsert({
+    where: { key: "shiftEnds" },
+    update: { value: clean },
+    create: { key: "shiftEnds", value: clean },
+  });
   revalidatePath("/", "layout");
   return ok();
 }
@@ -823,14 +734,14 @@ export async function deleteWorker(workerId: number): Promise<ActionResult> {
   if (!target) return fail("Worker not found.");
 
   // Protect the audit trail: anyone with recorded activity can only be deactivated.
-  const eventCount = await prisma.knifeEvent.count({ where: { workerId } });
+  const eventCount = await prisma.deviceEvent.count({ where: { workerId } });
   if (eventCount > 0) {
     return fail(
       "This employee has activity history — deactivate them instead so the audit trail stays intact."
     );
   }
-  if (await prisma.knife.count({ where: { checkedOutById: workerId } })) {
-    return fail("This employee currently holds a knife — return it first.");
+  if (await prisma.device.count({ where: { checkedOutById: workerId } })) {
+    return fail("This employee currently has a device checked out — return it first.");
   }
   if (hasRole(target.roles, ROLE.ADMIN) && target.active && (await activeAdminsExcluding(workerId)) === 0) {
     return fail("You can't remove the last admin — add another admin first.");
@@ -928,7 +839,6 @@ async function getTeamsConfig() {
           "teams.notifyOverdue",
           "teams.notifyCheckout",
           "teams.notifyCheckin",
-          "teams.notifyCleaned",
         ],
       },
     },
@@ -941,7 +851,6 @@ async function getTeamsConfig() {
     notifyOverdue: (map.get("teams.notifyOverdue") ?? "true") === "true",
     notifyCheckout: map.get("teams.notifyCheckout") === "true",
     notifyCheckin: map.get("teams.notifyCheckin") === "true",
-    notifyCleaned: map.get("teams.notifyCleaned") === "true",
   };
 }
 
@@ -952,7 +861,6 @@ export async function updateTeamsSettings(input: {
   notifyOverdue: boolean;
   notifyCheckout: boolean;
   notifyCheckin: boolean;
-  notifyCleaned: boolean;
 }): Promise<ActionResult> {
   const auth = await requireTeamsAdmin();
   if (!auth.ok) return fail(auth.error);
@@ -965,8 +873,7 @@ export async function updateTeamsSettings(input: {
       !input.notifyDamaged &&
       !input.notifyOverdue &&
       !input.notifyCheckout &&
-      !input.notifyCheckin &&
-      !input.notifyCleaned
+      !input.notifyCheckin
     ) {
       return fail("Choose at least one thing to be notified about.");
     }
@@ -978,7 +885,6 @@ export async function updateTeamsSettings(input: {
     ["teams.notifyOverdue", String(input.notifyOverdue)],
     ["teams.notifyCheckout", String(input.notifyCheckout)],
     ["teams.notifyCheckin", String(input.notifyCheckin)],
-    ["teams.notifyCleaned", String(input.notifyCleaned)],
   ];
   for (const [key, value] of entries) {
     await prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
@@ -993,7 +899,7 @@ export async function sendTeamsTest(): Promise<ActionResult> {
   if (!auth.ok) return fail(auth.error);
   const cfg = await getTeamsConfig();
   if (!cfg.webhookUrl) return fail("Add a webhook URL first.");
-  const err = await postToTeams(cfg.webhookUrl, "✅ Safety Knife Checkout — Teams notifications are connected.");
+  const err = await postToTeams(cfg.webhookUrl, "✅ Radio & Scanner Checkout — Teams notifications are connected.");
   return err ? fail(err) : ok();
 }
 
@@ -1052,7 +958,7 @@ export async function bulkAddWorkers(csv: string): Promise<BulkResult> {
     if (!name) { errors.push(`Row ${rowNo}: missing name.`); skipped++; continue; }
     if (!/^\d{4,8}$/.test(pin)) { errors.push(`Row ${rowNo} (${name}): PIN must be 4–8 digits.`); skipped++; continue; }
     const roles = rolesRaw.split(/[;| ]+/).map((r) => r.trim().toUpperCase()).filter((r) => r in ROLE);
-    if (roles.length === 0) { errors.push(`Row ${rowNo} (${name}): no valid roles (OPERATOR/SANITATION/QA/ADMIN).`); skipped++; continue; }
+    if (roles.length === 0) { errors.push(`Row ${rowNo} (${name}): no valid roles (OPERATOR/SUPERVISOR/ADMIN).`); skipped++; continue; }
     if (usedPins.has(pin) || existing.some((w) => verifyPin(pin, w.pin))) {
       errors.push(`Row ${rowNo} (${name}): PIN already in use.`); skipped++; continue;
     }

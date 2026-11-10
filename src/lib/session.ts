@@ -1,8 +1,8 @@
 import { cookies } from "next/headers";
 import { prisma } from "./prisma";
 
-const COOKIE = "knife_worker";
-const ADMIN_GATE = "knife_admin_gate";
+const COOKIE = "device_worker";
+const ADMIN_GATE = "device_admin_gate";
 
 export type CurrentWorker = {
   id: number;
@@ -40,7 +40,7 @@ export async function clearCurrentWorker(): Promise<void> {
   store.delete(COOKIE);
 }
 
-// A separate, short-lived gate for the admin dashboard. Entering an admin/QA
+// A separate, short-lived gate for the admin dashboard. Entering a supervisor/admin
 // PIN on the admin page sets this; it's required to view the dashboard even
 // when the worker is already signed in on the board.
 export async function setAdminGate(workerId: number): Promise<void> {

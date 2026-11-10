@@ -121,7 +121,7 @@ export function AdminGatePad() {
   return (
     <Keypad
       title="Admin access"
-      subtitle="Enter your admin or QA PIN to open the dashboard."
+      subtitle="Enter your supervisor or admin PIN to open the dashboard."
       submitLabel="Unlock"
       verify={unlockAdmin}
     />

@@ -7,58 +7,58 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// A physical safety knife in the fleet.
-model Knife {
+// A physical radio or scanner in the fleet.
+model Device {
   id       Int    @id @default(autoincrement())
-  number   String @unique // printed label, e.g. "53"
-  sortKey  Int    // numeric value of `number` for stable ordering
-  status   String @default("AVAILABLE") // AVAILABLE | CHECKED_OUT | DIRTY | CLEANED | DAMAGED | OUT_OF_SERVICE
-  type     String @default("FC") // FC (Food Contact) | NFC (Non-Food Contact)
-  scanCode String? @unique // reserved for future QR/barcode support
-  damageNote String? // set when sanitation flags a knife damaged; cleared on manager return
+  number   String @unique // printed label, e.g. "R7" or "S12"
+  sortKey  Int    // numeric part of `number` for stable ordering within a type
+  status   String @default("AVAILABLE") // AVAILABLE | CHECKED_OUT | DAMAGED | OUT_OF_SERVICE
+  type     String @default("RADIO") // RADIO | SCANNER
+  scanCode String? @unique // reserved for future barcode support
+  damageNote String? // set when a device is returned damaged; cleared on supervisor return
   damagePhoto String? // optional data-URL photo captured when flagging damage; cleared with the note
 
-  // current-cycle fields (cleared when the knife returns to AVAILABLE)
+  // current-cycle fields (cleared when the device returns to AVAILABLE)
   checkedOutById Int?
-  checkedOutBy   Worker? @relation("KnifeCheckedOutBy", fields: [checkedOutById], references: [id])
+  checkedOutBy   Worker? @relation("DeviceCheckedOutBy", fields: [checkedOutById], references: [id])
   checkedOutAt   DateTime?
   dueAt          DateTime?
 
   retiredAt DateTime?
 
-  events    KnifeEvent[]
+  events    DeviceEvent[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-// A person who acts on knives. Identified by a short PIN (and optional badge).
+// A person who acts on devices. Identified by a short PIN (and optional badge).
 model Worker {
   id       Int     @id @default(autoincrement())
   name     String
   pin      String  @unique // short numeric PIN entered on the tablet
   badgeId  String? @unique
-  roles    String  @default("OPERATOR") // comma-separated: OPERATOR,SANITATION,QA,ADMIN
+  roles    String  @default("OPERATOR") // comma-separated: OPERATOR,SUPERVISOR,ADMIN
   active   Boolean @default(true)
 
-  events         KnifeEvent[]
-  knivesOut      Knife[]      @relation("KnifeCheckedOutBy")
-  createdAt      DateTime     @default(now())
+  events         DeviceEvent[]
+  devicesOut     Device[]      @relation("DeviceCheckedOutBy")
+  createdAt      DateTime      @default(now())
 }
 
 // Immutable audit record — one row per state transition. Never edited or deleted.
-model KnifeEvent {
+model DeviceEvent {
   id         Int      @id @default(autoincrement())
-  knifeId    Int
-  knife      Knife    @relation(fields: [knifeId], references: [id])
+  deviceId   Int
+  device     Device   @relation(fields: [deviceId], references: [id])
   workerId   Int?
   worker     Worker?  @relation(fields: [workerId], references: [id])
-  action     String   // CHECKOUT | RETURN | CLEAN | QA_PASS | QA_FAIL | RETIRE | RESTORE | ADD
+  action     String   // CHECKOUT | RETURN | DAMAGE | SUPERVISOR_RETURN | RETIRE | RESTORE | ADD | EDIT
   fromStatus String?
   toStatus   String
   note       String?
   createdAt  DateTime @default(now())
 
-  @@index([knifeId])
+  @@index([deviceId])
   @@index([createdAt])
 }
 

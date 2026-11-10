@@ -3,7 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
-  addKnife,
+  addDevice,
+  updateShiftEnds,
   addWorker,
   setWorkerActive,
   updateWorker,
@@ -12,20 +13,21 @@ import {
   sendTeamsTest,
   bulkAddWorkers,
   updateLogo,
-  updateKnifeDetails,
-  deleteKnife,
+  updateDeviceDetails,
+  deleteDevice,
   type ActionResult,
 } from "@/app/actions";
 import { STATUS_META, TYPE_META, normalizeType, type DisplayState } from "@/lib/status";
 import type { TeamsSettings } from "@/lib/data";
 
-const ALL_ROLES = ["OPERATOR", "SANITATION", "QA", "MANAGER", "ADMIN"];
-const TYPES = ["FC", "NFC"] as const;
+const ALL_ROLES = ["OPERATOR", "SUPERVISOR", "ADMIN"];
+const TYPES = ["RADIO", "SCANNER"] as const;
+type DeviceTypeKey = (typeof TYPES)[number];
 const INPUT =
   "w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2";
 
 type WorkerRow = { id: number; name: string; roles: string; active: boolean };
-type KnifeRow = { id: number; number: string; type: string; status: string };
+type DeviceRow = { id: number; number: string; type: string; status: string };
 type SystemInfo = { timeZone: string; serverTime: string };
 
 export function AdminPanel({
@@ -33,7 +35,8 @@ export function AdminPanel({
   canManageWorkers,
   canManageTeams,
   logoDataUrl,
-  knives,
+  devices,
+  shiftEnds,
   system,
   teamsSettings,
   workers,
@@ -42,22 +45,23 @@ export function AdminPanel({
   canManageWorkers: boolean;
   canManageTeams: boolean;
   logoDataUrl: string | null;
-  knives: KnifeRow[];
+  devices: DeviceRow[];
+  shiftEnds: string;
   system: SystemInfo;
   teamsSettings: TeamsSettings;
   workers: WorkerRow[];
 }) {
-  // Managers get a read-only view: the fleet list (and, below this panel, the
-  // audit log). Adding knives, employees, and settings are admin/QA only.
+  // Anyone without config rights gets a read-only view of the fleet list (and,
+  // below this panel, the audit log).
   if (!canEdit) {
     return (
       <div className="space-y-6">
-        <Card title={`Knife fleet (${knives.length})`}>
+        <Card title={`Devices (${devices.length})`}>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-            You have <strong>view-only</strong> access as a manager. You can act on knives from
-            the fleet board; ask an admin to add, edit, or remove knives.
+            You have <strong>view-only</strong> access. Ask a supervisor or admin to add, edit,
+            or remove devices.
           </p>
-          <KnifeFleetSection knives={knives} readOnly />
+          <DeviceFleetSection devices={devices} readOnly />
         </Card>
       </div>
     );
@@ -66,11 +70,12 @@ export function AdminPanel({
   return (
     <div className="space-y-6">
       <div className={canManageWorkers ? "grid md:grid-cols-2 gap-6 items-start" : ""}>
-        <KnivesCard knives={knives} />
+        <DevicesCard devices={devices} />
         {canManageWorkers && <WorkersAndAddCard workers={workers} />}
       </div>
       <AdvancedCard
         logoDataUrl={logoDataUrl}
+        shiftEnds={shiftEnds}
         system={system}
         teamsSettings={teamsSettings}
         canManageTeams={canManageTeams}
@@ -79,44 +84,44 @@ export function AdminPanel({
   );
 }
 
-// Knives management: add a knife and manage the whole fleet in one card.
-function KnivesCard({ knives }: { knives: KnifeRow[] }) {
+// Device management: add a device and manage the whole fleet in one card.
+function DevicesCard({ devices }: { devices: DeviceRow[] }) {
   return (
-    <Card title="Knives">
-      <AddKnifeSection />
+    <Card title="Radios & scanners">
+      <AddDeviceSection />
       <div className="my-4 border-t border-slate-100 dark:border-slate-700" />
-      <KnifeFleetSection knives={knives} />
+      <DeviceFleetSection devices={devices} />
     </Card>
   );
 }
 
-function KnifeFleetSection({ knives, readOnly }: { knives: KnifeRow[]; readOnly?: boolean }) {
+function DeviceFleetSection({ devices, readOnly }: { devices: DeviceRow[]; readOnly?: boolean }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
-  // Match the number (with or without a leading #), the type (FC/NFC or the
-  // full label), or the status label shown on the row.
+  // Match the label (R7, S12, or just the number), the type, or the status
+  // label shown on the row.
   const visible = q
-    ? knives.filter((k) => {
+    ? devices.filter((k) => {
         const type = normalizeType(k.type);
         const statusLabel = STATUS_META[k.status as DisplayState]?.label ?? k.status;
         return (
-          k.number.includes(q.replace(/^#/, "")) ||
+          k.number.toLowerCase().includes(q.replace(/^#/, "")) ||
           type.toLowerCase().includes(q) ||
           TYPE_META[type].label.toLowerCase().includes(q) ||
           statusLabel.toLowerCase().includes(q)
         );
       })
-    : knives;
+    : devices;
 
   return (
     <div>
       {!readOnly && (
         <>
-          <h3 className="font-semibold mb-1">Knife fleet ({knives.length})</h3>
+          <h3 className="font-semibold mb-1">Device list ({devices.length})</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-            Edit a knife&apos;s number or type, or remove one added by mistake. Removing deletes
-            its history — to take a real knife out of rotation, use <strong>Retire</strong> on the
-            board.
+            Edit a device&apos;s label or type, or remove one added by mistake. Removing deletes
+            its history — to take a real device out of rotation, use <strong>Retire</strong> on
+            the board.
           </p>
         </>
       )}
@@ -124,18 +129,18 @@ function KnifeFleetSection({ knives, readOnly }: { knives: KnifeRow[]; readOnly?
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         type="search"
-        placeholder="Search by number, type, or status…"
-        aria-label="Search knives"
+        placeholder="Search by label, type, or status…"
+        aria-label="Search devices"
         className={`${INPUT} mb-2`}
       />
       {/* Tall list so most of the fleet is visible before scrolling. */}
       <ul className="divide-y divide-slate-100 dark:divide-slate-700 max-h-[40rem] overflow-y-auto">
         {visible.map((k) => (
-          <KnifeRowItem key={k.id} knife={k} readOnly={readOnly} />
+          <DeviceRowItem key={k.id} device={k} readOnly={readOnly} />
         ))}
         {visible.length === 0 && (
           <li className="py-4 text-center text-sm text-slate-400">
-            No knives match &quot;{query}&quot;.
+            No devices match &quot;{query}&quot;.
           </li>
         )}
       </ul>
@@ -143,15 +148,17 @@ function KnifeFleetSection({ knives, readOnly }: { knives: KnifeRow[]; readOnly?
   );
 }
 
-// Advanced settings: Teams notifications, the kiosk company logo, and a
-// read-only system readout (timezone that drives due dates).
+// Advanced settings: Teams notifications, shift end times, the kiosk company
+// logo, and a read-only system readout (timezone that drives due dates).
 function AdvancedCard({
   logoDataUrl,
+  shiftEnds,
   system,
   teamsSettings,
   canManageTeams,
 }: {
   logoDataUrl: string | null;
+  shiftEnds: string;
   system: SystemInfo;
   teamsSettings: TeamsSettings;
   canManageTeams: boolean;
@@ -161,7 +168,7 @@ function AdvancedCard({
       <summary className="cursor-pointer select-none list-none p-5 flex items-center justify-between">
         <span className="text-lg font-semibold">Advanced</span>
         <span className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
-          {canManageTeams ? "Teams notifications · kiosk logo · system" : "kiosk logo · system"}
+          {canManageTeams ? "Teams notifications · shifts · kiosk logo · system" : "shifts · kiosk logo · system"}
           <span aria-hidden className="transition-transform group-open:rotate-180">▾</span>
         </span>
       </summary>
@@ -172,6 +179,8 @@ function AdvancedCard({
             <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
           </>
         )}
+        <ShiftSection shiftEnds={shiftEnds} />
+        <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
         <LogoSection logoDataUrl={logoDataUrl} />
         <div className="my-5 border-t border-slate-100 dark:border-slate-700" />
         <SystemSection system={system} />
@@ -185,8 +194,8 @@ function SystemSection({ system }: { system: SystemInfo }) {
     <div>
       <h3 className="font-semibold mb-1">System</h3>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
-        Due dates are calculated in this timezone — FC knives are due end of day, NFC knives end
-        of Friday. Set the <code>TZ</code> environment variable to your plant&apos;s zone.
+        Due times are calculated in this timezone. Set the <code>TZ</code> environment variable
+        to your warehouse&apos;s zone.
       </p>
       <dl className="text-sm space-y-1">
         <div className="flex justify-between gap-4">
@@ -202,16 +211,16 @@ function SystemSection({ system }: { system: SystemInfo }) {
   );
 }
 
-function KnifeRowItem({ knife, readOnly }: { knife: KnifeRow; readOnly?: boolean }) {
+function DeviceRowItem({ device, readOnly }: { device: DeviceRow; readOnly?: boolean }) {
   const { pending, msg, run } = useRun();
   const [editing, setEditing] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
-  const [number, setNumber] = useState(knife.number);
-  const [type, setType] = useState<"FC" | "NFC">(normalizeType(knife.type));
+  const [number, setNumber] = useState(device.number);
+  const [type, setType] = useState<DeviceTypeKey>(normalizeType(device.type));
 
   function reset() {
-    setNumber(knife.number);
-    setType(normalizeType(knife.type));
+    setNumber(device.number);
+    setType(normalizeType(device.type));
     setEditing(false);
   }
 
@@ -221,8 +230,7 @@ function KnifeRowItem({ knife, readOnly }: { knife: KnifeRow; readOnly?: boolean
         <input
           value={number}
           onChange={(e) => setNumber(e.target.value)}
-          inputMode="numeric"
-          placeholder="Knife number"
+          placeholder="Label (e.g. R7)"
           className={INPUT}
         />
         <div className="flex gap-2">
@@ -237,14 +245,14 @@ function KnifeRowItem({ knife, readOnly }: { knife: KnifeRow; readOnly?: boolean
                   : "bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300"
               }`}
             >
-              {t === "FC" ? "Food Contact" : "Non-Food Contact"}
+              {TYPE_META[t].label}
             </button>
           ))}
         </div>
         <div className="flex gap-2">
           <button
             onClick={() =>
-              run(() => updateKnifeDetails(knife.id, { number, type }), `Knife #${number} updated.`, () => setEditing(false))
+              run(() => updateDeviceDetails(device.id, { number, type }), `${number} updated.`, () => setEditing(false))
             }
             disabled={pending}
             className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 text-sm disabled:opacity-50"
@@ -264,13 +272,13 @@ function KnifeRowItem({ knife, readOnly }: { knife: KnifeRow; readOnly?: boolean
     <li className="py-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="font-medium">#{knife.number}</span>
-          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${TYPE_META[normalizeType(knife.type)].badge}`}>
-            {TYPE_META[normalizeType(knife.type)].short}
+          <span className="font-medium">{device.number}</span>
+          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${TYPE_META[normalizeType(device.type)].badge}`}>
+            {TYPE_META[normalizeType(device.type)].label}
           </span>
           <span className="inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-            <span className={`inline-block w-2 h-2 rounded-full ${STATUS_META[knife.status as DisplayState]?.dot ?? "bg-slate-400"}`} />
-            {STATUS_META[knife.status as DisplayState]?.label ?? knife.status}
+            <span className={`inline-block w-2 h-2 rounded-full ${STATUS_META[device.status as DisplayState]?.dot ?? "bg-slate-400"}`} />
+            {STATUS_META[device.status as DisplayState]?.label ?? device.status}
           </span>
         </div>
         <div className="flex flex-wrap gap-1 justify-end">
@@ -285,7 +293,7 @@ function KnifeRowItem({ knife, readOnly }: { knife: KnifeRow; readOnly?: boolean
           {readOnly ? null : confirmRemove ? (
             <>
               <button
-                onClick={() => run(() => deleteKnife(knife.id), `Knife #${knife.number} removed.`, () => setConfirmRemove(false))}
+                onClick={() => run(() => deleteDevice(device.id), `${device.number} removed.`, () => setConfirmRemove(false))}
                 disabled={pending}
                 className="text-sm rounded-lg px-3 py-1.5 bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
               >
@@ -310,6 +318,38 @@ function KnifeRowItem({ knife, readOnly }: { knife: KnifeRow; readOnly?: boolean
       </div>
       <Msg msg={msg} />
     </li>
+  );
+}
+
+function ShiftSection({ shiftEnds }: { shiftEnds: string }) {
+  const { pending, msg, run } = useRun();
+  const [value, setValue] = useState(shiftEnds);
+  return (
+    <div>
+      <h3 className="font-semibold mb-1">Shift end times</h3>
+      <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+        Every checkout is due back at the next shift end (24-hour clock, comma separated). A
+        device checked out within an hour of a shift end is due at the following one, so the
+        incoming shift isn&apos;t marked overdue right away.
+      </p>
+      <div className="flex gap-2">
+        <input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="07:00, 15:00, 23:00"
+          aria-label="Shift end times"
+          className={`flex-1 ${INPUT}`}
+        />
+        <button
+          onClick={() => run(() => updateShiftEnds(value), "Shift times saved.")}
+          disabled={pending}
+          className="rounded-lg bg-slate-800 dark:bg-slate-600 hover:bg-slate-700 text-white px-4 disabled:opacity-50"
+        >
+          Save
+        </button>
+      </div>
+      <Msg msg={msg} />
+    </div>
   );
 }
 
@@ -344,7 +384,7 @@ function LogoSection({ logoDataUrl }: { logoDataUrl: string | null }) {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoDataUrl} alt="Current logo" className="max-h-12 max-w-[112px] object-contain" />
           ) : (
-            <span className="text-2xl" aria-hidden>🔪</span>
+            <span className="text-2xl" aria-hidden>📻</span>
           )}
         </div>
         <div className="space-y-2">
@@ -409,26 +449,26 @@ function Msg({ msg }: { msg: { ok: boolean; text: string } | null }) {
   );
 }
 
-function AddKnifeSection() {
+function AddDeviceSection() {
   const { pending, msg, run } = useRun();
   const [number, setNumber] = useState("");
-  const [type, setType] = useState<"FC" | "NFC">("FC");
+  const [type, setType] = useState<DeviceTypeKey>("RADIO");
   return (
     <div>
-      <h3 className="font-semibold mb-1">Add a knife</h3>
+      <h3 className="font-semibold mb-1">Add a device</h3>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-        New knives enter the fleet as Available.
+        New devices enter the fleet as Available. A bare number gets the type&apos;s letter
+        (21 → R21 or S21).
       </p>
       <div className="flex gap-2 mb-2">
         <input
           value={number}
           onChange={(e) => setNumber(e.target.value)}
-          inputMode="numeric"
-          placeholder="Knife number (e.g. 79)"
+          placeholder={`Label (e.g. ${TYPE_META[type].prefix}21)`}
           className={`flex-1 ${INPUT}`}
         />
         <button
-          onClick={() => run(() => addKnife(number, type), `Knife #${number} added.`)}
+          onClick={() => run(() => addDevice(number, type), `${TYPE_META[type].label} added.`)}
           disabled={pending}
           className="rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-4 disabled:opacity-50"
         >
@@ -436,20 +476,18 @@ function AddKnifeSection() {
         </button>
       </div>
       <div className="flex gap-2">
-        {(["FC", "NFC"] as const).map((t) => (
+        {TYPES.map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setType(t)}
             className={`flex-1 rounded-lg py-1.5 text-sm font-medium border ${
               type === t
-                ? t === "FC"
-                  ? "bg-slate-300 text-slate-800 border-transparent"
-                  : "bg-blue-600 text-white border-transparent"
+                ? `${TYPE_META[t].badge} border-transparent`
                 : "bg-white dark:bg-slate-700 border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300"
             }`}
           >
-            {t === "FC" ? "Food Contact" : "Non-Food Contact"}
+            {TYPE_META[t].label}
           </button>
         ))}
       </div>
@@ -461,10 +499,8 @@ function AddKnifeSection() {
 const SAMPLE_CSV =
   "name,pin,roles\n" +
   "Jane Operator,4501,OPERATOR\n" +
-  "Sam Sanitation,4502,SANITATION\n" +
-  "Pat Supervisor,4503,OPERATOR;SANITATION\n" +
-  "Quinn QA,4504,QA\n" +
-  "Alex Manager,4505,ADMIN\n";
+  "Pat Supervisor,4502,SUPERVISOR\n" +
+  "Alex Admin,4503,ADMIN\n";
 
 // One admin card holding "Add a worker" and the "Employees" list.
 function WorkersAndAddCard({ workers }: { workers: WorkerRow[] }) {
@@ -563,7 +599,7 @@ function AddWorkerSection() {
         <div className="text-sm font-medium mb-1">Bulk upload (CSV)</div>
         <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
           Columns: <code>name,pin,roles</code> (roles separated by <code>;</code> — e.g.
-          <code> OPERATOR;SANITATION</code>). Duplicate PINs are skipped.
+          <code> OPERATOR;SUPERVISOR</code>). Duplicate PINs are skipped.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -596,7 +632,6 @@ function TeamsSection({ settings }: { settings: TeamsSettings }) {
   const [notifyOverdue, setNotifyOverdue] = useState(settings.notifyOverdue);
   const [notifyCheckout, setNotifyCheckout] = useState(settings.notifyCheckout);
   const [notifyCheckin, setNotifyCheckin] = useState(settings.notifyCheckin);
-  const [notifyCleaned, setNotifyCleaned] = useState(settings.notifyCleaned);
 
   return (
     <div>
@@ -606,8 +641,8 @@ function TeamsSection({ settings }: { settings: TeamsSettings }) {
         (Teams channel → ⋯ → Workflows → &quot;Post to a channel when a webhook request is
         received&quot;; URL contains <code>logic.azure.com</code>) or a legacy{" "}
         <strong>Incoming Webhook</strong> connector. Both formats are supported automatically.
-        When a knife is flagged <strong>damaged</strong>, a message is posted to that channel so a
-        manager can review it. Use <strong>Send test message</strong> to confirm the connection.
+        When a device is returned <strong>damaged</strong>, a message is posted to that channel so
+        a supervisor can review it. Use <strong>Send test message</strong> to confirm the connection.
       </p>
 
       <label className="flex items-center gap-3 mb-3">
@@ -627,23 +662,19 @@ function TeamsSection({ settings }: { settings: TeamsSettings }) {
         <legend className="text-sm text-slate-600 dark:text-slate-300 mb-2">Notify when…</legend>
         <label className="flex items-center gap-3 mb-2">
           <input type="checkbox" checked={notifyDamaged} onChange={(e) => setNotifyDamaged(e.target.checked)} className="w-5 h-5" />
-          <span>A knife is flagged damaged (needs a manager) — live</span>
+          <span>A device is returned damaged (needs a supervisor) — live</span>
         </label>
         <label className="flex items-center gap-3 mb-2">
           <input type="checkbox" checked={notifyOverdue} onChange={(e) => setNotifyOverdue(e.target.checked)} className="w-5 h-5" />
-          <span>A knife goes overdue (requires a scheduled job)</span>
+          <span>A device goes overdue (requires a scheduled job)</span>
         </label>
         <label className="flex items-center gap-3 mb-2">
           <input type="checkbox" checked={notifyCheckout} onChange={(e) => setNotifyCheckout(e.target.checked)} className="w-5 h-5" />
-          <span>A knife is checked out (with its due-back time) — live</span>
-        </label>
-        <label className="flex items-center gap-3 mb-2">
-          <input type="checkbox" checked={notifyCheckin} onChange={(e) => setNotifyCheckin(e.target.checked)} className="w-5 h-5" />
-          <span>A knife is checked in — live</span>
+          <span>A device is checked out (with its due-back time) — live</span>
         </label>
         <label className="flex items-center gap-3">
-          <input type="checkbox" checked={notifyCleaned} onChange={(e) => setNotifyCleaned(e.target.checked)} className="w-5 h-5" />
-          <span>A knife is cleaned &amp; returned to service — live</span>
+          <input type="checkbox" checked={notifyCheckin} onChange={(e) => setNotifyCheckin(e.target.checked)} className="w-5 h-5" />
+          <span>A device is checked in — live</span>
         </label>
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
           Per-action alerts can be chatty on a busy floor — they are off by default.
@@ -662,7 +693,6 @@ function TeamsSection({ settings }: { settings: TeamsSettings }) {
                   notifyOverdue,
                   notifyCheckout,
                   notifyCheckin,
-                  notifyCleaned,
                 }),
               "Teams settings saved."
             )
@@ -685,8 +715,8 @@ function TeamsSection({ settings }: { settings: TeamsSettings }) {
   );
 }
 
-// Group order for the employee list and export: Admin → QA → Operator → Sanitation.
-const ROLE_ORDER = ["ADMIN", "QA", "OPERATOR", "SANITATION"];
+// Group order for the employee list and export: Admin → Supervisor → Operator.
+const ROLE_ORDER = ["ADMIN", "SUPERVISOR", "OPERATOR"];
 function rolePriority(roles: string): number {
   const set = roles.split(",").map((r) => r.trim());
   const i = ROLE_ORDER.findIndex((r) => set.includes(r));
@@ -734,7 +764,7 @@ function EmployeesSection({ workers }: { workers: WorkerRow[] }) {
         </button>
       </div>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-        Sorted by role: Admin, QA, Operator, Sanitation. Edit an employee&apos;s name, roles, or
+        Sorted by role: Admin, Supervisor, Operator. Edit an employee&apos;s name, roles, or
         PIN; deactivate to revoke access while keeping their history; remove to delete entirely.
       </p>
       <input

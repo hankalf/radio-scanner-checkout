@@ -6,8 +6,8 @@ import { canAccessAdmin } from "@/lib/status";
 import { LogoutButton } from "@/components/SessionControls";
 
 export const metadata: Metadata = {
-  title: "Safety Knife Checkout",
-  description: "Check out, sanitize, and QA-inspect food-production safety knives.",
+  title: "Radio & Scanner Checkout",
+  description: "Check warehouse radios and scanners out and back in, with an audit trail.",
 };
 
 export const viewport: Viewport = {
@@ -39,8 +39,8 @@ export default async function RootLayout({
           <header className="bg-slate-900 text-white">
             <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-4">
               <Link href="/" className="flex items-center gap-2 font-semibold text-lg">
-                <span aria-hidden>🔪</span>
-                <span>Safety Knife Checkout</span>
+                <span aria-hidden>📻</span>
+                <span>Radio &amp; Scanner Checkout</span>
               </Link>
               <div className="flex items-center gap-3 text-sm">
                 <Link
@@ -77,7 +77,7 @@ export default async function RootLayout({
           </header>
           <main className="flex-1 mx-auto w-full max-w-6xl px-4 py-6">{children}</main>
           <footer className="text-center text-xs text-slate-400 py-4">
-            Food-safety knife tracking · every action is logged for audit
+            Radio &amp; scanner tracking · every action is logged for audit
           </footer>
         </div>
       </body>

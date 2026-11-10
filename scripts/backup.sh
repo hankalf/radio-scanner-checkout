@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Back up the Safety Knife Checkout database to a timestamped SQL dump.
+# Back up the Radio & Scanner Checkout database to a timestamped SQL dump.
 #
 # Usage:
 #   ./scripts/backup.sh                 # writes to ./backups/
@@ -31,7 +31,7 @@ BACKUP_DIR="${BACKUP_DIR:-$(dirname "$0")/../backups}"
 mkdir -p "$BACKUP_DIR"
 
 STAMP="$(date +%Y%m%d-%H%M%S)"
-OUT="$BACKUP_DIR/knife-backup-$STAMP.sql.gz"
+OUT="$BACKUP_DIR/device-backup-$STAMP.sql.gz"
 
 # Prisma appends a `?schema=public` query param that pg_dump rejects; strip it.
 DUMP_URL="$(printf '%s' "$DATABASE_URL" | sed -E 's/([?&])schema=[^&]*(&|$)/\1/; s/[?&]$//')"
@@ -43,4 +43,4 @@ echo "Done: $(du -h "$OUT" | cut -f1) $OUT"
 
 # Optional retention: keep the newest 30 dumps in BACKUP_DIR.
 KEEP="${BACKUP_KEEP:-30}"
-ls -1t "$BACKUP_DIR"/knife-backup-*.sql.gz 2>/dev/null | tail -n +$((KEEP + 1)) | xargs -r rm -f
+ls -1t "$BACKUP_DIR"/device-backup-*.sql.gz 2>/dev/null | tail -n +$((KEEP + 1)) | xargs -r rm -f

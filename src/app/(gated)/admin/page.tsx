@@ -7,15 +7,16 @@ import {
   canManageTeams,
   ACTION_LABEL,
 } from "@/lib/status";
-import { getWorkers, getRecentEvents, getTeamsSettings, getLogoDataUrl, getKnives } from "@/lib/data";
+import { getWorkers, getRecentEvents, getTeamsSettings, getLogoDataUrl, getDevices, getShiftEnds } from "@/lib/data";
 import { AdminPanel } from "@/components/AdminPanel";
+import { formatShiftEnds } from "@/lib/schedule";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
   const worker = await getCurrentWorker();
-  // The (gated) layout already limits this area to admins/QA and no second
+  // The (gated) layout already limits this area to supervisors/admins and no second
   // sign-in is needed here. Keep a defensive check just in case.
   if (!worker || !canAccessAdmin(worker.roles)) {
     return (
@@ -28,12 +29,13 @@ export default async function AdminPage() {
     );
   }
 
-  const [workers, events, teamsSettings, logoDataUrl, knives] = await Promise.all([
+  const [workers, events, teamsSettings, logoDataUrl, devices, shiftEnds] = await Promise.all([
     getWorkers(),
     getRecentEvents(50),
     getTeamsSettings(),
     getLogoDataUrl(),
-    getKnives(),
+    getDevices(),
+    getShiftEnds(),
   ]);
 
   return (
@@ -53,7 +55,8 @@ export default async function AdminPage() {
         canManageWorkers={canManageWorkers(worker.roles)}
         canManageTeams={canManageTeams(worker.roles)}
         logoDataUrl={logoDataUrl}
-        knives={knives.map((k) => ({ id: k.id, number: k.number, type: k.type, status: k.status }))}
+        devices={devices.map((k) => ({ id: k.id, number: k.number, type: k.type, status: k.status }))}
+        shiftEnds={formatShiftEnds(shiftEnds)}
         system={{
           timeZone:
             process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
@@ -87,7 +90,7 @@ export default async function AdminPage() {
             <thead className="text-left text-slate-500 dark:text-slate-400 border-b dark:border-slate-700">
               <tr>
                 <th className="py-2 pr-4">When</th>
-                <th className="py-2 pr-4">Knife</th>
+                <th className="py-2 pr-4">Device</th>
                 <th className="py-2 pr-4">Action</th>
                 <th className="py-2 pr-4">By</th>
                 <th className="py-2 pr-4">Note</th>
@@ -99,7 +102,7 @@ export default async function AdminPage() {
                   <td className="py-2 pr-4 whitespace-nowrap text-slate-500 dark:text-slate-400">
                     {e.createdAt.toLocaleString()}
                   </td>
-                  <td className="py-2 pr-4 font-medium">#{e.knife.number}</td>
+                  <td className="py-2 pr-4 font-medium">{e.device.number}</td>
                   <td className="py-2 pr-4">{ACTION_LABEL[e.action] ?? e.action}</td>
                   <td className="py-2 pr-4">{e.worker?.name ?? "—"}</td>
                   <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">{e.note ?? ""}</td>

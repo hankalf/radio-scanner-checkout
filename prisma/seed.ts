@@ -1,42 +1,35 @@
 import { PrismaClient } from "@prisma/client";
 import { hashPin } from "../src/lib/crypto";
+import { DEFAULT_SHIFT_ENDS } from "../src/lib/schedule";
 
 const prisma = new PrismaClient();
 
-// The current fleet: 42 knives labelled 1–14, 51–64, 65–78.
-// 1–14 are Food Contact (returned daily); 51–78 are Non-Food Contact
-// (out for the week, due Friday).
-function knifeNumbers(): { n: number; type: "FC" | "NFC" }[] {
-  const ranges: [number, number, "FC" | "NFC"][] = [
-    [1, 14, "FC"],
-    [51, 64, "NFC"],
-    [65, 78, "NFC"],
-  ];
-  const nums: { n: number; type: "FC" | "NFC" }[] = [];
-  for (const [start, end, type] of ranges) {
-    for (let n = start; n <= end; n++) nums.push({ n, type });
-  }
-  return nums;
-}
+// The starting fleet: 20 radios (R1–R20) and 20 scanners (S1–S20).
+// Add, relabel, or remove devices later from the Admin screen.
+const FLEET: { prefix: string; type: "RADIO" | "SCANNER"; count: number }[] = [
+  { prefix: "R", type: "RADIO", count: 20 },
+  { prefix: "S", type: "SCANNER", count: 20 },
+];
 
 // Starter workers so every role can be exercised immediately.
 // PINs are only defaults — change them in the Admin screen.
 const workers = [
-  { name: "Admin", pin: "0000", roles: "ADMIN,OPERATOR,SANITATION,QA" },
+  { name: "Admin", pin: "0000", roles: "ADMIN" },
   { name: "Olivia (Operator)", pin: "1111", roles: "OPERATOR" },
-  { name: "Sam (Sanitation)", pin: "2222", roles: "SANITATION" },
-  { name: "Quinn (QA)", pin: "3333", roles: "QA" },
+  { name: "Sam (Supervisor)", pin: "2222", roles: "SUPERVISOR" },
 ];
 
 async function main() {
-  // Knives — idempotent upsert so re-seeding never duplicates. The type is
-  // enforced on every run so the fleet's FC/NFC assignment stays correct.
-  for (const { n, type } of knifeNumbers()) {
-    await prisma.knife.upsert({
-      where: { number: String(n) },
-      update: { type },
-      create: { number: String(n), sortKey: n, status: "AVAILABLE", type },
-    });
+  // Devices — only seeded into an empty fleet, so devices an admin removed or
+  // relabeled are never re-created on the next deploy.
+  if ((await prisma.device.count()) === 0) {
+    for (const { prefix, type, count } of FLEET) {
+      for (let n = 1; n <= count; n++) {
+        await prisma.device.create({
+          data: { number: `${prefix}${n}`, sortKey: n, status: "AVAILABLE", type },
+        });
+      }
+    }
   }
 
   // Workers.
@@ -50,15 +43,15 @@ async function main() {
 
   // Settings.
   await prisma.setting.upsert({
-    where: { key: "checkoutWindowHours" },
+    where: { key: "shiftEnds" },
     update: {},
-    create: { key: "checkoutWindowHours", value: "24" },
+    create: { key: "shiftEnds", value: DEFAULT_SHIFT_ENDS },
   });
 
-  const knifeCount = await prisma.knife.count();
+  const deviceCount = await prisma.device.count();
   const workerCount = await prisma.worker.count();
-  console.log(`Seed complete: ${knifeCount} knives, ${workerCount} workers.`);
-  console.log("Default PINs — Admin 0000, Operator 1111, Sanitation 2222, QA 3333");
+  console.log(`Seed complete: ${deviceCount} devices, ${workerCount} workers.`);
+  console.log("Default PINs — Admin 0000, Operator 1111, Supervisor 2222");
 }
 
 main()

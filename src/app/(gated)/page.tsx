@@ -1,7 +1,7 @@
-import { getKnives } from "@/lib/data";
+import { getDevices } from "@/lib/data";
 import { getCurrentWorker } from "@/lib/session";
 import { effectiveRoles, canManageConfig } from "@/lib/status";
-import KnifeBoard, { type KnifeDTO } from "@/components/KnifeBoard";
+import DeviceBoard, { type DeviceDTO } from "@/components/DeviceBoard";
 import { Legend } from "@/components/Legend";
 
 // Always render fresh — this is a live shared board.
@@ -9,10 +9,10 @@ export const dynamic = "force-dynamic";
 
 // The (gated) layout guarantees a signed-in worker before this renders.
 export default async function DashboardPage() {
-  const [knives, worker] = await Promise.all([getKnives(), getCurrentWorker()]);
+  const [devices, worker] = await Promise.all([getDevices(), getCurrentWorker()]);
   const roles = effectiveRoles(worker?.roles ?? "");
 
-  const dto: KnifeDTO[] = knives.map((k) => ({
+  const dto: DeviceDTO[] = devices.map((k) => ({
     id: k.id,
     number: k.number,
     status: k.status,
@@ -27,14 +27,14 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold mb-1">Knife fleet</h1>
+        <h1 className="text-2xl font-bold mb-1">Radios &amp; scanners</h1>
         <p className="text-slate-500 text-sm">
-          Tap a knife to act on it. The board refreshes automatically.
+          Tap a device to act on it. The board refreshes automatically.
         </p>
       </div>
 
-      <KnifeBoard
-        knives={dto}
+      <DeviceBoard
+        devices={dto}
         roles={roles}
         signedIn={true}
         canConfigure={canManageConfig(worker?.roles ?? "")}

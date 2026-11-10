@@ -1,108 +1,88 @@
-# Safety Knife Checkout System
+# Radio & Scanner Checkout
 
-A tablet-first web app for tracking pre-numbered food-production safety knives through
-their full lifecycle: **operator checkout → sanitation cleaning & inspection → back in
-service**. A knife kept out past its due date is flagged overdue. Every action is recorded
-for food-safety auditing. Day-to-day the app runs in **kiosk mode on a shared iPad**; the
-management board and admin panel are for admins, QA, and managers.
+A tablet-first web app for tracking a warehouse's **two-way radios and handheld scanners**:
+**operator checks one out → uses it for the shift → returns it to the charger**. A device kept
+out past the end of its shift is flagged overdue, and every action is recorded in an audit
+log. Day-to-day the app runs in **kiosk mode on a shared iPad**; the fleet board and admin
+panel are for supervisors and admins.
+
+Adapted from the production knife checkout dashboard (`hankalf/production-knife-dashboard`).
 
 ## Lifecycle
 
 ```
-AVAILABLE ──checkout(operator)──▶ CHECKED_OUT ──return(operator)──▶ DIRTY
-   ▲                                                                   │
-   │                                    sanitation cleans + inspects   │
-   │                                                                    ▼
-   └───── condition GOOD ◀──────────────── 4-question checklist ──────▶ DAMAGED
-                                                                         │
-                       manager/admin returns to service ◀─────────────┘
+AVAILABLE ──checkout(operator)──▶ CHECKED_OUT ──return checklist──▶ condition GOOD ──▶ AVAILABLE
+                                                       │
+                                                       └──▶ condition DAMAGED ──▶ DAMAGED
+                                                                                    │
+                                    supervisor/admin returns to service ◀───────────┘
 ```
 
-Before a used knife goes back in service, **sanitation answers a 4-question checklist**
-(all prompts bilingual, English + Spanish):
+Checking a device in runs a short **return checklist** (bilingual, English + Spanish):
 
-1. **Cleaned?** Yes / No
-2. **Inspected?** Yes / No
-3. **Condition** — Good or Damaged
-4. If **Damaged**, describe why — and optionally **attach a photo** (captured on the tablet,
-   downscaled on-device)
+1. **Placed on the charger?** — must be **Yes** to submit.
+2. **Condition** — Good or Damaged.
+3. If **Damaged**, describe what's wrong — and optionally **attach a photo** (captured on the
+   tablet, downscaled on-device).
 
-A **Good** knife (cleaned **and** inspected) returns straight to service. A **Damaged** knife
-moves to a **DAMAGED** state with the reported reason and photo, and **only a manager or admin**
-can return it to service from the board — **QA, a manager, or an admin** (where they see the reason and photo).
+A **Good** device goes straight back to Available. A **Damaged** device is held in a
+**DAMAGED** state with the reason and photo until a **supervisor or admin** returns it to
+service from the fleet board.
 
-- **Overdue** is derived (a checked-out knife past its due date), shown in red with a banner.
-- **Out of service** — admins/QA can retire damaged/lost knives and restore them later.
+- **Overdue** is derived (a checked-out device past its due time), shown in red with a banner.
+- **Out of service** — supervisors/admins can retire lost or broken devices and restore them.
 
-### Knife type & due dates
+### Device types & labels
 
-Each knife is **Food Contact (FC)** or **Non-Food Contact (NFC)**. In this fleet,
-**#1–#14 are FC** and **#51–#78 are NFC** (the seed enforces this). The type drives the
-**due date** at checkout:
+The seed creates **20 radios (R1–R20)** and **20 scanners (S1–S20)**. Tiles are **filled by
+type** — blue for radios, amber for scanners — and **ringed by status**: green available,
+white checked out, red overdue, magenta damaged, dimmed out of service. A checked-out tile
+also shows **who has it** (first name + last initial) and **when it's due back**.
 
-- **FC** — checked out and returned the **same day**, due by end of shift (end of today).
-- **NFC** — signed out for the week (Mon–Fri), **due end of Friday**.
+Add, relabel, or remove devices in **Admin**. Typing a bare number when adding a device gives
+it the type's letter (`21` → `R21` or `S21`). The seed only runs into an empty fleet, so
+devices you remove or relabel are never re-created on the next deploy.
 
-On **both** the kiosk and the management board a tile is **filled by type** — silver/metal
-for FC, blue for NFC, with the type spelled out — and **ringed by status**: green available, yellow
-checked out, orange awaiting sanitation, red damaged, red + "OVERDUE" when past due. A
-checked-out tile also shows **who has it** (first name + last initial) and **when it's due
-back**. Set the type when adding a knife, or change it later from the knife's action modal
-(admin/QA). New knives default to FC.
+### Due times (end of shift)
 
-> Due dates use the **server's local time** — set the `TZ` environment variable (e.g.
-> `TZ=America/New_York` for Eastern) so "end of day/Friday" matches the plant's timezone. The active
-> timezone and current server time are shown in **Admin → Advanced → System** so you can
-> confirm it at a glance. `render.yaml` sets `TZ` for Render; on Railway add it as a variable.
+Every checkout is due at the **next shift end**. Shift end times are set in
+**Admin → Advanced → Shift end times** (24-hour clock, default `07:00, 15:00, 23:00`). A
+device checked out **within an hour** of a shift end is due at the following one, so the
+incoming shift isn't marked overdue the moment they pick up a radio.
+
+> Due times use the **server's local time** — set the `TZ` environment variable (e.g.
+> `TZ=America/New_York`) so shift ends match the warehouse. The active timezone and current
+> server time are shown in **Admin → Advanced → System**. `render.yaml` sets `TZ` for Render;
+> on Railway add it as a variable.
 
 ## Roles (identified by PIN)
 
 | Role | Can do |
 |------|--------|
-| Operator | Check out an available knife; return **their own** checked-out knife after use (kiosk only) |
-| Sanitation | Clean & inspect used (dirty) knives via the checklist, returning good ones to service |
-| QA | Fleet board, reports, and admin panel: manages **knives** and the kiosk logo, and can return **damaged** knives to service — but **not** employees or Teams settings |
-| **Manager** | Floor supervisor: does every **operator, sanitation, and QA** job, reviews **damaged** knives, and can **view** the knife fleet + audit log — but the admin panel is **read-only** (no Add a knife, Workers, or Advanced, and no editing knives) |
+| Operator | Check out an available device and check in **their own** device (kiosk) |
+| **Supervisor** | Everything an operator does, plus: check in a device someone else left out, return **damaged** devices to service, view the fleet board and reports, manage devices (add/edit/remove/retire/restore), set shift times, kiosk logo, and kiosk lock |
 | Admin | **Everything** — all of the above plus **manage employees & PINs** (add/edit/bulk-upload/remove) and **configure Teams alerts** |
 
-A worker can hold multiple roles. **Admins implicitly have every capability**, and a
-**manager** implicitly holds the operator, sanitation, and QA capabilities. Only the
-operator who checked a knife out (or an admin) can return it, so returns are attributed to the
-right person.
+## Access
 
-## Access & the admin panel
-
-The app is used **99% of the time in kiosk mode** by employees on a shared iPad, so the two
-surfaces are gated very differently:
-
-- **`/kiosk`** — open to everyone, no sign-in. Employees tap a knife and confirm each action
+- **`/kiosk`** — open to everyone, no sign-in. Employees tap a device and confirm each action
   with their PIN. This is the everyday floor surface.
-- The **management board (`/`)**, reports, knife history, and the **admin panel (`/admin`)**
-  are restricted to **admins, QA, and managers** (managers get a read-only admin panel).
-  Visiting them shows a **full-screen PIN sign-in**; a worker without one of those roles is
-  told the area is kiosk-only and pointed back to the kiosk.
-- Once an admin, QA, or manager is signed in on the board, opening the **Admin** tab needs **no second
-  PIN** — the existing session carries through.
+- The **fleet board (`/`)**, reports, device history, and the **admin panel (`/admin`)** are
+  restricted to **supervisors and admins**. Visiting them shows a full-screen PIN sign-in; an
+  operator is told the area is kiosk-only and pointed back to the kiosk.
 
 ## Screens
 
-- **`/`** *(admin/QA)* — live color-coded fleet board; tap a knife to act on it. Sanitation/QA
-  get a **batch mode** to clear many knives at once. A manager returns **damaged** knives to
-  service here.
-- **`/reports`** *(admin/QA)* — end-of-day sweep of everything still checked out, plus fleet
-  metrics: average return→clean turnaround, total cleanings, and most-used knives.
-- **`/kiosk`** — full-screen, **bilingual (English + Spanish)** floor surface for the shared
-  iPad (auto-refreshes). Employees check out, check in, and clean+inspect knives right on the
-  kiosk, confirming each action with their PIN. A checked-out knife's bubble shows **who has
-  it out**. Cleaning runs the 4-question sanitation checklist. An optional **company logo**
-  shows in the top-left corner.
-- **`/admin`** *(admin/QA)* — add knives and **manage the whole fleet** (edit a knife's
-  number/type, or remove a mis-added one), retire/restore, manage workers (including
-  **CSV bulk upload**), upload a **company logo** for the kiosk, configure **Teams alerts**
-  (see below), export the full audit log to CSV, and toggle **light/dark mode** from the
-  header. The light/dark choice applies across the management surfaces (board, reports,
-  admin, knife history); the kiosk keeps its own high-contrast dark display.
-- **`/knife/<number>`** *(admin/QA)* — a single knife's complete lifecycle history.
+- **`/kiosk`** — full-screen, **bilingual** board for the shared iPad (auto-refreshes):
+  radios on the top rows, scanners below. Check out and check in right on the kiosk. An
+  optional **company logo** shows in the top-left corner (upload it in Admin → Advanced).
+- **`/`** — live color-coded fleet board; tap a device to act on it. Supervisors return
+  **damaged** devices to service and retire/restore devices here.
+- **`/reports`** — end-of-shift sweep of everything still checked out, plus fleet metrics:
+  total checkouts, average time out, damage reports, and most-used devices.
+- **`/admin`** — manage devices and workers (including **CSV bulk upload**), shift end
+  times, kiosk logo, **Teams alerts**, and export the full audit log to CSV.
+- **`/device/<label>`** — a single device's complete history.
 
 ## Tech stack
 
@@ -110,37 +90,25 @@ surfaces are gated very differently:
 - **PostgreSQL + Prisma** — managed database with versioned migrations
 - **Tailwind CSS** — touch-friendly, tablet-first UI
 
-> **Deployment targets:** `main` is set up for **Railway** and **Render** (see below), which
-> build the app with their native Node builders. The full **Docker Desktop** setup
-> (Dockerfile + Compose) lives on the **`claude/docker-desktop`** branch, so it doesn't
-> interfere with those hosts.
-
 ## Getting started (local dev)
 
-You need a PostgreSQL database. Start a throwaway one with Docker (or use any Postgres and
-put its URL in `.env`), then run the app:
-
 ```bash
-docker run -d --name knife-db \
-  -e POSTGRES_USER=knife -e POSTGRES_PASSWORD=knife -e POSTGRES_DB=knifedb \
+docker run -d --name device-db \
+  -e POSTGRES_USER=device -e POSTGRES_PASSWORD=device -e POSTGRES_DB=devicedb \
   -p 5432:5432 postgres:16       # or use your own Postgres + set DATABASE_URL in .env
 npm install
 npm run db:migrate               # apply migrations (creates the tables)
-npm run db:seed                  # seed 42 knives (1–14, 51–64, 65–78) + starter workers
+npm run db:seed                  # seed R1–R20, S1–S20 + starter workers
 npm run dev                      # http://localhost:3000
 ```
-
-To run the whole app in containers instead, use the **`claude/docker-desktop`** branch
-(`docker compose up --build`).
 
 ### Default PINs (change these in Admin)
 
 | Role | PIN |
 |------|-----|
-| Admin (all roles) | `0000` |
+| Admin | `0000` |
 | Operator | `1111` |
-| Sanitation | `2222` |
-| QA | `3333` |
+| Supervisor | `2222` |
 
 ### Useful scripts
 
@@ -150,10 +118,9 @@ To run the whole app in containers instead, use the **`claude/docker-desktop`** 
 - `npm run test:e2e` — run the Playwright end-to-end suite
 - `node docs/capture_sop_shots.mjs` — refresh the SOP screenshots (app must be running;
   set `PW_BASE_URL`, and `TZ` on the server so times look right)
-- `python3 docs/build_sop.py` — regenerate the SOP PDF (`docs/Safety-Knife-Checkout-SOP.pdf`)
-- `python3 docs/build_sop_es.py` — regenerate the Spanish SOP (`docs/Safety-Knife-Checkout-SOP-ES.pdf`)
-- `npm run build && npm start` — production build/run
-- `npx prisma studio` — inspect the database (knives, events, workers)
+- `python3 docs/build_sop.py` — regenerate the SOP PDF (`docs/Radio-Scanner-Checkout-SOP.pdf`)
+- `python3 docs/build_sop_es.py` — regenerate the Spanish SOP (`docs/Radio-Scanner-Checkout-SOP-ES.pdf`)
+- `npx prisma studio` — inspect the database (devices, events, workers)
 
 ## Deploy on Render (Blueprint)
 
@@ -161,97 +128,64 @@ The repo includes a `render.yaml` Blueprint that provisions the web service **an
 PostgreSQL database together.
 
 1. In [Render](https://render.com): **New → Blueprint**, connect this repo, pick `main`, and
-   **Apply**. Render reads `render.yaml` and creates the `safety-knife-checkout` web service
-   plus the `knife-db` Postgres, wiring `DATABASE_URL` automatically.
-2. On first deploy the app applies migrations and seeds the fleet, then serves. Open the URL
-   Render gives you and sign in with the default PINs below.
-
-The Blueprint uses Render's entry paid plans (`starter` web + `basic-256mb` Postgres) so the
-service stays awake and the database is persistent; adjust the `plan:` values to size up/down.
+   **Apply**. Render creates the `radio-scanner-checkout` web service plus the `device-db`
+   Postgres, wiring `DATABASE_URL` automatically.
+2. On first deploy the app applies migrations and seeds the fleet, then serves. Sign in with
+   the default PINs and change them.
 
 ## Deploy on Railway
 
-Railway gives you a public URL you can open on any device (including a floor tablet), and
-this repo is set up so it deploys with almost no configuration. `start:prod` applies
-database migrations and seeds the fleet on every boot.
-
-1. Go to [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo**
-   and pick `production-knife-dashboard` (choose the branch you want to deploy).
-2. In the same project, click **New → Database → Add PostgreSQL**. Railway provisions it and
-   exposes its connection string as a `DATABASE_URL` variable.
-3. Open your app service → **Variables** → add a reference variable
-   **`DATABASE_URL`** = `${{Postgres.DATABASE_URL}}` (Railway autocompletes this once the
-   Postgres service exists), so the app points at the database.
+1. [railway.app](https://railway.app) → **New Project** → **Deploy from GitHub repo** →
+   `radio-scanner-checkout`.
+2. **New → Database → Add PostgreSQL**.
+3. App service → **Variables** → add **`DATABASE_URL`** = `${{Postgres.DATABASE_URL}}` and
+   **`TZ`** = your warehouse's timezone (e.g. `America/New_York`).
 4. Railway builds with `npm run build`, then runs `npm run start:prod` (migrate → seed →
-   serve). When it's green, open **Settings → Networking → Generate Domain** for your URL.
-5. Sign in with the default PINs — **Admin `0000`, Operator `1111`, Sanitation `2222`,
-   QA `3333`** — and change them in Admin.
-
-Data lives in the Postgres service and persists across redeploys. The seed is idempotent,
-so redeploys never duplicate knives or workers.
+   serve). Open **Settings → Networking → Generate Domain** for your URL.
 
 ## Audit log
 
-Every transition writes an immutable `KnifeEvent` (knife, action, from/to status, worker,
-timestamp, note). View a single knife's history at `/knife/<number>`, or export the full
-log to CSV from the Admin screen (`/api/export`).
+Every transition writes an immutable `DeviceEvent` (device, action, from/to status, worker,
+timestamp, note — the return checklist answers are stored in the note). View a single
+device's history at `/device/<label>`, or export the full log to CSV from Admin
+(`/api/export`).
 
 ## Bulk-add workers (CSV)
 
-Under **Admin → Add a worker** you can **upload a CSV** to add many workers at once, and
-**download a sample CSV** to fill in. Columns are `name,pin,roles` (one worker per row); the
-`roles` column accepts multiple roles separated by `;`, `|`, or spaces (e.g.
-`SANITATION;QA`). Rows with a duplicate or invalid PIN are skipped and reported, so a partial
-file still imports cleanly.
+Under **Admin → Add a worker** you can upload a CSV with columns `name,pin,roles`; `roles`
+accepts `OPERATOR`, `SUPERVISOR`, `ADMIN`, separated by `;`, `|`, or spaces. Rows with a
+duplicate or invalid PIN are skipped and reported.
 
 ## Teams notifications
 
-The Admin screen has a **Microsoft Teams notifications** panel. Paste an **Incoming Webhook
-URL** for a Teams channel, enable it, and choose what to be notified about:
-
-- **Damaged knives** — fires **live** the moment sanitation flags a knife damaged (no
-  scheduler needed).
-- **Overdue sweep** — the end-of-day list of knives still checked out. This one needs a
-  scheduled job to call the sweep on a timer; the preference and message are in place.
-
-Settings are saved to the `Setting` store (`teams.*` keys), and a **Send test message**
-button posts to the channel so you can confirm the webhook before relying on it.
+Admins can paste a Teams webhook URL (Workflows or legacy Incoming Webhook) in
+**Admin → Advanced** and choose alerts: **damaged returns** (live), **checkouts** and
+**check-ins** (live, off by default), and the **overdue sweep** (needs a scheduled job).
+**Send test message** confirms the connection.
 
 ## Testing
 
-End-to-end tests (Playwright) cover the critical flows: kiosk access/bilingual copy, the
-admin/QA gate on the board, the full kiosk lifecycle (checkout → holder shown → check-in →
-sanitation "Good" → available), and the damaged → manager-return path.
+Playwright end-to-end tests cover kiosk access and bilingual copy, the supervisor/admin
+gate, the kiosk checkout → return round trip, the charger requirement, the holder-only
+return rule, the damaged → supervisor-return path, end-of-shift due times, supervisor
+permissions, and adding a device.
 
 ```bash
-# Against a server Playwright starts itself (production build):
 npm run build
-npm run test:e2e
-
-# Against an already-running dev server:
-PW_BASE_URL=http://localhost:3000 npm run test:e2e
+npm run test:e2e                                   # Playwright starts the server itself
+PW_BASE_URL=http://localhost:3000 npm run test:e2e # or against a running dev server
 ```
 
-The tests run against a real PostgreSQL database and assert on persisted state. CI runs them
-on every push/PR via `.github/workflows/e2e.yml` (spins up Postgres, migrates, seeds, builds,
-and runs the suite).
+CI runs them on every push/PR via `.github/workflows/e2e.yml`.
 
 ## Database backups
 
-The audit log is the compliance backbone, so back the database up regularly.
-
 ```bash
-npm run db:backup            # writes ./backups/knife-backup-<timestamp>.sql.gz
+npm run db:backup            # writes ./backups/device-backup-<timestamp>.sql.gz
 BACKUP_DIR=/mnt/nas npm run db:backup
 ```
 
-`scripts/backup.sh` runs `pg_dump` against `DATABASE_URL` (loading it from `.env` if needed),
-gzips the dump, and keeps the newest 30 (override with `BACKUP_KEEP`). To run it on a
-schedule, add a cron entry on the host, a **Railway cron service**, or a **Render cron job**
-that runs `npm run db:backup` and ships the file to durable storage. Railway and Render also
-provide their own managed Postgres backups — this script is for portable, off-host copies.
-
 ## Ideas reserved for later
 
-- QR/barcode scanning — the schema already has a `scanCode` field per knife.
+- Barcode scanning — the schema already has a `scanCode` field per device.
 - A scheduled job to drive the Teams **overdue sweep** on a timer.

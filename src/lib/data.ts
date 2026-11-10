@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { DEFAULT_SHIFT_ENDS, parseShiftEnds } from "./schedule";
 
 export type TeamsSettings = {
   enabled: boolean;
@@ -7,7 +8,6 @@ export type TeamsSettings = {
   notifyOverdue: boolean;
   notifyCheckout: boolean;
   notifyCheckin: boolean;
-  notifyCleaned: boolean;
 };
 
 const TEAMS_KEYS = [
@@ -17,7 +17,6 @@ const TEAMS_KEYS = [
   "teams.notifyOverdue",
   "teams.notifyCheckout",
   "teams.notifyCheckin",
-  "teams.notifyCleaned",
 ] as const;
 
 export async function getTeamsSettings(): Promise<TeamsSettings> {
@@ -31,7 +30,6 @@ export async function getTeamsSettings(): Promise<TeamsSettings> {
     // Per-action alerts are off by default — they're chatty on a busy floor.
     notifyCheckout: map.get("teams.notifyCheckout") === "true",
     notifyCheckin: map.get("teams.notifyCheckin") === "true",
-    notifyCleaned: map.get("teams.notifyCleaned") === "true",
   };
 }
 
@@ -48,17 +46,24 @@ export async function getKioskLocked(): Promise<boolean> {
   return s?.value === "true";
 }
 
-export async function getKnives() {
-  return prisma.knife.findMany({
-    orderBy: { sortKey: "asc" },
+// Shift end times (minutes after midnight) that drive due dates.
+export async function getShiftEnds(): Promise<number[]> {
+  const s = await prisma.setting.findUnique({ where: { key: "shiftEnds" } });
+  return parseShiftEnds(s?.value ?? DEFAULT_SHIFT_ENDS);
+}
+
+// Radios first, then scanners, each in label order (R1, R2 … S1, S2 …).
+export async function getDevices() {
+  return prisma.device.findMany({
+    orderBy: [{ type: "asc" }, { sortKey: "asc" }, { number: "asc" }],
     include: { checkedOutBy: { select: { name: true } } },
   });
 }
 
-export type KnifeWithHolder = Awaited<ReturnType<typeof getKnives>>[number];
+export type DeviceWithHolder = Awaited<ReturnType<typeof getDevices>>[number];
 
-export async function getKnifeByNumber(number: string) {
-  return prisma.knife.findUnique({
+export async function getDeviceByNumber(number: string) {
+  return prisma.device.findUnique({
     where: { number },
     include: {
       checkedOutBy: { select: { name: true } },
@@ -75,22 +80,22 @@ export async function getWorkers() {
 }
 
 export async function getRecentEvents(limit = 100) {
-  return prisma.knifeEvent.findMany({
+  return prisma.deviceEvent.findMany({
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {
       worker: { select: { name: true } },
-      knife: { select: { number: true } },
+      device: { select: { number: true } },
     },
   });
 }
 
 export async function getAllEventsForExport() {
-  return prisma.knifeEvent.findMany({
+  return prisma.deviceEvent.findMany({
     orderBy: { createdAt: "asc" },
     include: {
       worker: { select: { name: true } },
-      knife: { select: { number: true } },
+      device: { select: { number: true } },
     },
   });
 }

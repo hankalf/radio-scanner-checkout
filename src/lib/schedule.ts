@@ -1,23 +1,54 @@
-// Due-date rules by knife type. Uses the server's local time zone — set the
-// container/host TZ (e.g. TZ=America/Chicago) to match the plant.
+// Due-date rule: every device is due back at the end of the shift it was
+// checked out on. Shift end times are a Setting ("shiftEnds", e.g.
+// "07:00,15:00,23:00") so the warehouse can match its own schedule.
 //
-//   FC  (Food Contact)      → due end of the SAME day (checked out & back by end of shift)
-//   NFC (Non-Food Contact)  → due end of FRIDAY of the checkout week (out M–F, back Friday)
+// Uses the server's local time zone — set the container/host TZ
+// (e.g. TZ=America/New_York) to match the warehouse.
 
-function endOfDay(d: Date): Date {
-  const e = new Date(d);
-  e.setHours(23, 59, 59, 999);
-  return e;
+export const DEFAULT_SHIFT_ENDS = "07:00,15:00,23:00";
+
+// A device checked out this close to a shift end (e.g. by the incoming
+// shift arriving early) is due at the FOLLOWING shift end instead.
+export const EARLY_CHECKOUT_GRACE_MIN = 60;
+
+// Parse "07:00, 15:00,23:00" into sorted minutes-after-midnight. Invalid
+// entries are dropped; an empty result means "end of day".
+export function parseShiftEnds(value: string | null | undefined): number[] {
+  const mins = (value ?? "")
+    .split(/[,\s]+/)
+    .map((s) => /^(\d{1,2}):(\d{2})$/.exec(s.trim()))
+    .filter((m): m is RegExpExecArray => !!m)
+    .map((m) => Number(m[1]) * 60 + Number(m[2]))
+    .filter((m) => m >= 0 && m < 24 * 60);
+  return [...new Set(mins)].sort((a, b) => a - b);
 }
 
-export function computeDueDate(type: string, now: Date): Date {
-  if (type === "NFC") {
-    // Days until Friday (getDay: Sun=0 … Fri=5 … Sat=6). If already Friday, today.
-    const daysUntilFriday = (5 - now.getDay() + 7) % 7;
-    const friday = new Date(now);
-    friday.setDate(now.getDate() + daysUntilFriday);
-    return endOfDay(friday);
+export function formatShiftEnds(mins: number[]): string {
+  return mins
+    .map((m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`)
+    .join(", ");
+}
+
+export function computeDueDate(shiftEnds: number[], now: Date): Date {
+  if (shiftEnds.length === 0) {
+    const e = new Date(now);
+    e.setHours(23, 59, 59, 999);
+    return e;
   }
-  // FC (default): end of today.
-  return endOfDay(now);
+  const earliest = now.getTime() + EARLY_CHECKOUT_GRACE_MIN * 60_000;
+  // Look at today's and tomorrow's shift ends; the first one past the grace
+  // window is the due time.
+  for (let day = 0; day <= 1; day++) {
+    for (const m of shiftEnds) {
+      const d = new Date(now);
+      d.setDate(now.getDate() + day);
+      d.setHours(Math.floor(m / 60), m % 60, 0, 0);
+      if (d.getTime() >= earliest) return d;
+    }
+  }
+  // Unreachable with at least one shift end, but keep a sane fallback.
+  const d = new Date(now);
+  d.setDate(now.getDate() + 2);
+  d.setHours(Math.floor(shiftEnds[0] / 60), shiftEnds[0] % 60, 0, 0);
+  return d;
 }

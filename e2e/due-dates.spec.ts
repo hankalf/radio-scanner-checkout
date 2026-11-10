@@ -1,41 +1,36 @@
 import { test, expect } from "@playwright/test";
-import { enterPin, PIN, prisma, resetKnife, kioskTile } from "./helpers";
+import { PIN, prisma, resetDevice, kioskStart, statusOf } from "./helpers";
+import { computeDueDate, parseShiftEnds, DEFAULT_SHIFT_ENDS } from "../src/lib/schedule";
 
 test.afterAll(async () => {
   await prisma.$disconnect();
 });
 
-// Type-based due dates: FC knives come back the same day (end of shift);
-// NFC knives are out for the week and due Friday end of day.
-test("FC checkout is due end of today; NFC end of Friday", async ({ page }) => {
-  const FC = "11";
-  const NFC = "12";
-  await resetKnife(FC, "FC");
-  await resetKnife(NFC, "NFC");
+// Pure due-time rule: next shift end, skipping one that's within the grace hour.
+test("due time is the next shift end", () => {
+  const ends = parseShiftEnds("07:00, 15:00,23:00");
+  const at = (h: number, m = 0) => new Date(2026, 10, 10, h, m);
+  expect(computeDueDate(ends, at(9)).getHours()).toBe(15);
+  expect(computeDueDate(ends, at(16)).getHours()).toBe(23);
+  // 14:30 is within an hour of 15:00, so the incoming shift gets 23:00.
+  expect(computeDueDate(ends, at(14, 30)).getHours()).toBe(23);
+  // Late night wraps to tomorrow's 07:00.
+  const overnight = computeDueDate(ends, at(23, 30));
+  expect(overnight.getDate()).toBe(11);
+  expect(overnight.getHours()).toBe(7);
+});
 
-  for (const n of [FC, NFC]) {
-    await page.goto("/kiosk");
-    await kioskTile(page, n).click();
-    await enterPin(page, PIN.operator);
-    await page.getByRole("button", { name: /Siguiente/ }).click();
-    await page.getByRole("button", { name: /Yes, that's me/ }).click();
-    await expect
-      .poll(async () => (await prisma.knife.findFirst({ where: { number: n } }))?.status)
-      .toBe("CHECKED_OUT");
-  }
+test("kiosk checkout stamps the next shift end", async ({ page }) => {
+  const N = "R18";
+  await resetDevice(N);
+  const before = new Date();
+  await kioskStart(page, N, PIN.operator, /Yes, that's me/);
+  await expect.poll(() => statusOf(N)).toBe("CHECKED_OUT");
 
-  const now = new Date();
-  const endOfToday = new Date(now);
-  endOfToday.setHours(23, 59, 59, 999);
-  const friday = new Date(now);
-  friday.setDate(now.getDate() + ((5 - now.getDay() + 7) % 7));
-  friday.setHours(23, 59, 59, 999);
+  const setting = await prisma.setting.findUnique({ where: { key: "shiftEnds" } });
+  const expected = computeDueDate(parseShiftEnds(setting?.value ?? DEFAULT_SHIFT_ENDS), before);
+  const device = await prisma.device.findFirst({ where: { number: N } });
+  expect(device!.dueAt!.getTime()).toBe(expected.getTime());
 
-  const fc = await prisma.knife.findFirst({ where: { number: FC } });
-  const nfc = await prisma.knife.findFirst({ where: { number: NFC } });
-  expect(Math.abs(fc!.dueAt!.getTime() - endOfToday.getTime())).toBeLessThan(5000);
-  expect(Math.abs(nfc!.dueAt!.getTime() - friday.getTime())).toBeLessThan(5000);
-
-  await resetKnife(FC, "FC");
-  await resetKnife(NFC, "FC");
+  await resetDevice(N);
 });

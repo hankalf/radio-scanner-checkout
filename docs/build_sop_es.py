@@ -1,7 +1,7 @@
-"""Genera el SOP del Safety Knife Checkout System en PDF — versión en español.
+"""Genera el SOP de Radio & Scanner Checkout en PDF — versión en español.
 
 Ejecutar:  python3 docs/build_sop_es.py
-Salida: docs/Safety-Knife-Checkout-SOP-ES.pdf
+Salida: docs/Radio-Scanner-Checkout-SOP-ES.pdf
 
 Los nombres de botones y menús en pantalla se citan en inglés (tal como
 aparecen en la aplicación), con su explicación en español.
@@ -29,7 +29,7 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-OUT = Path(__file__).resolve().parent / "Safety-Knife-Checkout-SOP-ES.pdf"
+OUT = Path(__file__).resolve().parent / "Radio-Scanner-Checkout-SOP-ES.pdf"
 
 # Paleta que aproxima la de la aplicación.
 NAVY = colors.HexColor("#0f172a")
@@ -203,18 +203,14 @@ def callout(title, text, color=AMBER):
 
 def on_page(canvas, doc):
     canvas.saveState()
-    # Regla del encabezado
     canvas.setStrokeColor(BORDER)
     canvas.setLineWidth(0.5)
     canvas.line(0.9 * inch, 10.35 * inch, 7.6 * inch, 10.35 * inch)
     canvas.setFont("Helvetica", 8)
     canvas.setFillColor(SLATE)
-    canvas.drawString(0.9 * inch, 10.45 * inch,
-                      "Safety Knife Checkout System — Procedimiento Operativo Estándar")
-    # Pie de página
+    canvas.drawString(0.9 * inch, 10.45 * inch, "Radio & Scanner Checkout — Procedimiento Operativo Estándar")
     canvas.line(0.9 * inch, 0.72 * inch, 7.6 * inch, 0.72 * inch)
-    canvas.drawString(0.9 * inch, 0.55 * inch,
-                      "Control de cuchillos para seguridad alimentaria — cada acción queda registrada para auditoría")
+    canvas.drawString(0.9 * inch, 0.55 * inch, "Control de radios y escáneres del almacén — cada acción queda registrada")
     canvas.drawRightString(7.6 * inch, 0.55 * inch, f"Página {doc.page}")
     canvas.restoreState()
 
@@ -224,38 +220,38 @@ def build():
         str(OUT), pagesize=letter,
         leftMargin=0.9 * inch, rightMargin=0.9 * inch,
         topMargin=0.95 * inch, bottomMargin=0.9 * inch,
-        title="Safety Knife Checkout System — POE (Español)",
-        author="Production Knife Dashboard",
-        subject="Procedimiento Operativo Estándar y referencia de configuración de administración",
+        title="Radio & Scanner Checkout — Procedimiento Operativo Estándar",
+        author="Radio & Scanner Checkout",
+        subject="Procedimiento Operativo Estándar y referencia de configuración",
     )
     frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="body")
     doc.addPageTemplates([PageTemplate(id="main", frames=[frame], onPage=on_page)])
 
-    s = []  # contenido
+    s = []
     W = doc.width
 
     # ---------------- Portada ----------------
     s.append(Spacer(1, 1.1 * inch))
-    s.append(P("Safety Knife Checkout System", "title"))
+    s.append(P("Radio &amp; Scanner Checkout", "title"))
     s.append(P("Procedimiento Operativo Estándar<br/>Standard Operating Procedure", "subtitle"))
     s.append(Spacer(1, 0.15 * inch))
     s.append(table(
-        [["Alcance", "Retiro, devolución, limpieza e inspección de los cuchillos de "
-                     "seguridad numerados de producción de alimentos."],
-         ["Aplica a", "Operadores, Saneamiento, Control de Calidad (QA), Gerentes y Administradores."],
-         ["Uso diario", "El <b>quiosco</b> en el iPad compartido (horizontal). No requiere iniciar sesión."],
-         ["Gestión", "Tablero de la flota, Reportes y panel de Administración — <b>administradores, QA y gerentes</b>."],
-         ["Registros", "Cada acción escribe una entrada de auditoría inalterable (quién, qué, cuándo)."]],
+        [["Alcance", "Sacar los radios y escáneres del almacén al inicio del turno y "
+                     "devolverlos, en su cargador, al final."],
+         ["Aplica a", "Operadores, Supervisores y Administradores."],
+         ["Uso diario", "El <b>kiosco</b> en el iPad compartido (horizontal). No requiere iniciar sesión."],
+         ["Gestión", "Tablero de equipos, Reportes y panel de Admin — <b>supervisores y administradores</b>."],
+         ["Registros", "Cada acción crea un registro de auditoría que no se puede modificar (quién, qué, cuándo)."]],
         [1.25 * inch, W - 1.25 * inch], header=False, zebra=False))
     s.append(Spacer(1, 0.3 * inch))
     s.append(callout(
         "Por qué es importante",
-        "Un cuchillo nunca debe volver a la producción de alimentos sin haber sido "
-        "limpiado e inspeccionado. El sistema hace cumplir ese orden — es imposible "
-        "retirar un cuchillo que no haya sido limpiado y aprobado en la inspección.", BLUE))
+        "Los radios y escáneres se pierden entre turnos y regresan con la batería "
+        "descargada. El kiosco registra quién tiene cada equipo, marca lo que no regresa "
+        "al final del turno y asegura que cada uno vuelva a su cargador.", BLUE))
     s.append(Spacer(1, 0.22 * inch))
     s.append(figure("kiosk-board",
-                    "El quiosco en el iPad compartido — lo que el piso de producción ve todo el día.",
+                    "El kiosco en el iPad compartido — lo que ve el piso todo el día.",
                     max_w=6.6 * inch, max_h=3.1 * inch))
 
     s.append(PageBreak())
@@ -263,354 +259,264 @@ def build():
     # ---------------- Contenido ----------------
     s.append(P("Contenido", "h1"))
     s.append(table(
-        [["1", "El ciclo de vida del cuchillo de un vistazo"],
-         ["2", "Roles y PINs"],
-         ["3", "Política de devolución — cuándo debe regresar un cuchillo"],
-         ["4", "Uso del quiosco (uso diario en el piso)"],
-         ["5", "Cómo leer el tablero del quiosco"],
-         ["6", "Saneamiento: lista de verificación de limpieza e inspección"],
-         ["7", "Cuchillos dañados — revisión del gerente"],
-         ["8", "Tareas del gerente en el tablero de la flota"],
+        [["1", "El ciclo del equipo de un vistazo"],
+         ["2", "Roles y PIN"],
+         ["3", "Política de devolución — fin del turno"],
+         ["4", "Uso del kiosco (uso diario en el piso)"],
+         ["5", "Cómo leer el tablero del kiosco"],
+         ["6", "La lista de devolución"],
+         ["7", "Equipos dañados — revisión del supervisor"],
+         ["8", "Tareas del supervisor en el tablero"],
          ["9", "Reportes"],
-         ["10", "Avanzado: cada configuración de administración y qué hace (y qué ve un gerente)"],
+         ["10", "Configuración de Admin y qué hace cada opción"],
          ["11", "Solución de problemas"]],
         [0.4 * inch, W - 0.4 * inch], header=False, zebra=False))
 
-    # ---------------- 1. Ciclo de vida ----------------
-    s.append(section("1. El ciclo de vida del cuchillo de un vistazo", P(
-        "Cada cuchillo pasa por una secuencia fija. El sistema bloquea cualquier paso "
-        "que se intente fuera de orden.")))
+    # ---------------- 1 ----------------
+    s.append(section("1. El ciclo del equipo de un vistazo", P(
+        "Cada radio y escáner sigue una secuencia corta y fija. El sistema bloquea cualquier "
+        "paso fuera de orden.")))
     s.append(table(
-        [["Etapa", "Quién", "Qué sucede"],
-         ["<b>Disponible</b> (Available)", "—", "Limpio, inspeccionado y listo para usar."],
-         ["<b>Retirado</b> (Checked out)", "Operador", "En uso. El cuchillo muestra quién lo tiene y cuándo debe regresar."],
-         ["<b>Esperando saneamiento</b> (Awaiting sanitation)", "El operador lo devuelve", "Cuchillo usado esperando limpieza. <b>No puede</b> retirarse de nuevo en este estado."],
-         ["<b>Disponible</b> (de nuevo)", "Saneamiento", "Limpiado e inspeccionado, condición Buena → vuelve al servicio."],
-         ["<b>Dañado</b> (Damaged)", "Saneamiento lo reporta", "Retenido fuera de servicio con un motivo (y foto opcional) hasta que un <b>gerente</b> lo revise."],
-         ["<b>Fuera de servicio</b> (Out of service)", "Admin/QA lo retira", "Eliminado de la rotación (perdido, roto, reemplazado)."]],
-        [1.6 * inch, 1.25 * inch, W - 2.85 * inch]))
+        [["Etapa", "Quién", "Qué pasa"],
+         ["<b>Available</b> (Disponible)", "—", "En el cargador y listo para usar."],
+         ["<b>Checked out</b> (Prestado)", "Operador", "En uso. El cuadro muestra quién lo tiene y cuándo se debe devolver."],
+         ["<b>Available</b> (otra vez)", "El operador lo devuelve", "En el cargador, condición Buena → listo para la siguiente persona."],
+         ["<b>Damaged</b> (Dañado)", "El operador lo reporta", "Fuera de uso con un motivo (y foto opcional) hasta que un <b>supervisor</b> lo revise."],
+         ["<b>Out of service</b> (Fuera de servicio)", "El supervisor lo retira", "Fuera de la rotación (perdido, roto, en reparación)."]],
+        [1.5 * inch, 1.35 * inch, W - 2.85 * inch]))
     s.append(Spacer(1, 8))
     s.append(P(
-        "<b>Vencido</b> (Overdue) no es una etapa aparte — cualquier cuchillo retirado "
-        "que pase de su hora límite se marca automáticamente como vencido, se pone en "
-        "rojo y aparece en el aviso en la parte superior del quiosco."))
+        "<b>Overdue</b> (Vencido) no es una etapa aparte — cualquier equipo prestado después "
+        "del fin de su turno se marca como vencido automáticamente, con un borde rojo, y aparece "
+        "en el aviso en la parte superior del kiosco."))
 
-    # ---------------- 2. Roles ----------------
-    s.append(section("2. Roles y PINs", P(
-        "Cada empleado tiene un PIN corto (4–8 dígitos) que lo identifica. El PIN "
-        "determina qué puede hacer. Una persona puede tener más de un rol.")))
+    # ---------------- 2 ----------------
+    s.append(section("2. Roles y PIN", P(
+        "Cada empleado tiene un PIN corto (4–8 dígitos) que lo identifica. El PIN determina "
+        "lo que puede hacer.")))
     s.append(table(
-        [["Rol", "Puede hacer"],
-         ["Operador", "Retirar un cuchillo disponible; devolver el cuchillo que <b>él mismo</b> retiró."],
-         ["Saneamiento", "Limpiar e inspeccionar los cuchillos usados, devolviendo al servicio los que están en buen estado o reportando daños."],
-         ["QA", "El tablero de la flota, los reportes y el panel de administración — gestiona los <b>cuchillos</b> y revisa los cuchillos <b>dañados</b>, pero no gestiona empleados ni la configuración de Teams."],
-         ["<b>Gerente</b> (Manager)", "Un supervisor de piso. Hace <b>todas</b> las funciones de operador, saneamiento y QA, revisa los cuchillos <b>dañados</b> y puede <b>ver</b> la flota de cuchillos y el registro de auditoría — pero <b>no puede cambiar nada</b> en el panel de administración (vea la sección 10)."],
-         ["Administrador (Admin)", "Todo, incluida la gestión de <b>empleados</b> y la configuración de <b>notificaciones de Teams</b>."]],
+        [["Rol", "Puede"],
+         ["Operator (Operador)", "Sacar un equipo disponible; devolver el equipo que <b>él mismo</b> sacó."],
+         ["<b>Supervisor</b>", "Todo lo que hace un operador, y además: devolver un equipo que otra persona dejó, regresar equipos <b>dañados</b> al servicio, retirar y restaurar equipos, usar el tablero y los reportes, y administrar equipos, horarios de turno y el logo del kiosco en Admin."],
+         ["Admin (Administrador)", "Todo, incluso administrar <b>empleados</b> y las <b>notificaciones de Teams</b>."]],
         [1.5 * inch, W - 1.5 * inch]))
     s.append(Spacer(1, 10))
     s.append(callout(
-        "Cambie los PINs predeterminados antes de comenzar a usar el sistema",
-        "Una instalación nueva incluye cuentas de ejemplo — Admin <b>0000</b>, Operador "
-        "<b>1111</b>, Saneamiento <b>2222</b>, QA <b>3333</b>. Configure PINs reales en "
-        "Admin → Workers desde el primer día y elimine las cuentas de ejemplo que no "
-        "necesite. Los PINs se guardan cifrados y no pueden leerse — si alguien olvida "
-        "el suyo, un gerente le asigna uno nuevo."))
+        "Cambie los PIN predeterminados antes de empezar",
+        "Una instalación nueva trae cuentas de ejemplo — Admin <b>0000</b>, Operador "
+        "<b>1111</b>, Supervisor <b>2222</b>. Configure PIN reales en Admin → Workers el "
+        "primer día y elimine los de ejemplo. Los PIN se guardan cifrados y no se pueden "
+        "consultar — si alguien olvida el suyo, un administrador le asigna uno nuevo."))
 
-    # ---------------- 3. Política de devolución ----------------
-    s.append(section("3. Política de devolución — cuándo debe regresar un cuchillo", P(
-        "El tipo de cuchillo fija su fecha de devolución automáticamente al retirarlo.")))
+    # ---------------- 3 ----------------
+    s.append(section("3. Política de devolución — fin del turno", P(
+        "Cada radio y escáner se debe devolver <b>al final del turno</b> en que se sacó, en "
+        "su cargador. La hora de devolución se asigna automáticamente al sacarlo.")))
     s.append(table(
-        [["Tipo de cuchillo", "Color en el quiosco", "Debe devolverse"],
-         ["<b>Contacto con alimentos (FC)</b> — cuchillos #1–#14", "Ficha plateada/metálica", "<b>El mismo día</b>, al final del turno."],
-         ["<b>Sin contacto con alimentos (NFC)</b> — cuchillos #51–#78", "Ficha azul", "<b>Al final de la semana</b> — vence el viernes, al final del turno."]],
-        [1.9 * inch, 1.3 * inch, W - 3.2 * inch]))
+        [["Equipo", "Color en el kiosco", "Etiquetas", "Se debe devolver"],
+         ["<b>Radio</b>", "Cuadro azul", "R1–R20", "Al final del turno, en el cargador."],
+         ["<b>Escáner</b> (Scanner)", "Cuadro ámbar", "S1–S20", "Al final del turno, en el cargador."]],
+        [1.25 * inch, 1.25 * inch, 0.9 * inch, W - 3.4 * inch]))
     s.append(Spacer(1, 8))
     s.append(P(
-        "La política aparece impresa en la parte superior del quiosco en inglés y "
-        "español. Cuando un empleado retira un cuchillo, la pantalla de confirmación "
-        "muestra la fecha y hora exactas de devolución, y esa hora aparece después en "
-        "la ficha del cuchillo."))
+        "Un supervisor define las horas de fin de turno en Admin (predeterminado "
+        "<b>07:00, 15:00, 23:00</b>). Si saca un equipo <b>dentro de una hora</b> antes del fin "
+        "de un turno — por ejemplo, al llegar temprano al siguiente turno — se debe devolver "
+        "al fin del turno <b>siguiente</b>. La pantalla de confirmación siempre muestra la hora "
+        "exacta, y esa hora aparece en el cuadro del equipo."))
 
-    # ---------------- 4. Uso del quiosco ----------------
-    s.append(section("4. Uso del quiosco (uso diario en el piso)", P(
-        "El quiosco es el iPad compartido en el piso. No requiere iniciar sesión — cada "
-        "acción se confirma con el PIN del propio empleado, que es lo que registra "
-        "quién la hizo.")))
+    # ---------------- 4 ----------------
+    s.append(section("4. Uso del kiosco (uso diario en el piso)", P(
+        "El kiosco es el iPad compartido en el piso. No requiere iniciar sesión — cada "
+        "acción se confirma con el PIN del empleado, que es lo que registra quién la hizo.")))
 
-    s.append(KeepTogether([P("Retirar un cuchillo — Operador", "h2"), steps([
-        "Toque el cuchillo que quiere. Debe tener un <b>anillo verde</b> (Disponible).",
+    s.append(KeepTogether([P("Sacar un equipo", "h2"), steps([
+        "Tome un radio o escáner del cargador y toque su cuadro. Debe tener un "
+        "<b>borde verde</b> (Available).",
         "Ingrese su PIN y toque <b>Next / Siguiente</b>.",
         "Aparece su nombre. Confirme que es usted — toque <b>Yes, that's me / Sí</b>. "
         "(Si no es su nombre, toque <b>Not me</b> e intente de nuevo.)",
-        "La pantalla muestra cuándo debe <b>regresar</b> el cuchillo. La ficha ahora "
-        "muestra su nombre arriba y un anillo amarillo.",
+        "La pantalla muestra cuándo se debe <b>devolver</b>. El cuadro ahora muestra su "
+        "nombre arriba y un borde blanco.",
     ])]))
     s.append(figure_row([
         ("kiosk-pin", "Paso 2 — ingrese su PIN."),
         ("kiosk-confirm", "Paso 3 — confirme su nombre y vea la hora de devolución."),
     ]))
 
-    s.append(KeepTogether([P("Devolver un cuchillo — Operador", "h2"), steps([
-        "Toque su cuchillo (anillo amarillo, con su nombre).",
-        "Ingrese su PIN, toque <b>Next</b> y confirme su nombre.",
-        "El cuchillo pasa a <b>Esperando saneamiento</b> (anillo naranja). Con eso "
-        "termina — no lo devuelva usted mismo al servicio.",
+    s.append(KeepTogether([P("Devolver un equipo", "h2"), steps([
+        "Ponga el equipo <b>en su cargador</b>.",
+        "Toque su cuadro (borde blanco, con su nombre).",
+        "Ingrese su PIN, toque <b>Next</b>, confirme su nombre y toque "
+        "<b>Yes — continue / Sí</b>.",
+        "Conteste la lista de devolución (sección 6) y toque <b>Submit / Enviar</b>.",
     ])]))
     s.append(Spacer(1, 4))
     s.append(P(
-        "<i>Solo la persona que retiró un cuchillo (o un gerente) puede devolverlo.</i> "
-        "Así cada devolución queda atribuida a la persona correcta.", "small"))
+        "<i>Solo la persona que sacó el equipo (o un supervisor) puede devolverlo.</i> Si "
+        "encuentra un equipo que otra persona dejó, póngalo en el cargador y avise a un "
+        "supervisor.", "small"))
 
-    s.append(KeepTogether([P("Limpiar y devolver al servicio — Saneamiento", "h2"), steps([
-        "Toque un cuchillo con <b>anillo naranja</b> (Esperando saneamiento).",
-        "Ingrese su PIN, toque <b>Next</b>, confirme su nombre y toque "
-        "<b>Yes — continue / Sí</b>.",
-        "Responda las cuatro preguntas de inspección (sección siguiente).",
-        "Toque <b>Submit / Enviar</b>.",
-    ])]))
-
-    # ---------------- 5. Cómo leer el tablero ----------------
-    s.append(section("5. Cómo leer el tablero del quiosco", P(
-        "Cada cuchillo es una ficha. El <b>color de relleno</b> indica el tipo de "
-        "cuchillo; el <b>anillo alrededor de la ficha</b> indica su estado.")))
+    # ---------------- 5 ----------------
+    s.append(section("5. Cómo leer el tablero del kiosco", P(
+        "Cada equipo es un cuadro. El <b>color de relleno</b> indica el tipo (azul radio, "
+        "ámbar escáner); el <b>borde</b> indica su estado. Los radios ocupan las filas de "
+        "arriba y los escáneres las de abajo.")))
     s.append(table(
-        [["Color del anillo", "Estado", "Qué hacer"],
-         ["Verde", "Disponible", "Listo para retirar."],
-         ["Amarillo", "Retirado", "En uso — el nombre de quien lo tiene aparece arriba en la ficha, con la hora de devolución."],
-         ["Naranja", "Esperando saneamiento", "Saneamiento debe limpiarlo e inspeccionarlo."],
-         ["Rojo + “OVERDUE”", "Vencido", "Pasó su hora límite. Localícelo y devuélvalo ahora."],
-         ["Rojo (rosa)", "Dañado — requiere gerente", "Fuera de uso hasta que un gerente lo revise."],
-         ["Gris", "Fuera de servicio", "Retirado de la flota."]],
-        [1.5 * inch, 1.55 * inch, W - 3.05 * inch]))
+        [["Color del borde", "Estado", "Qué hacer"],
+         ["Verde", "Available (Disponible)", "En el cargador, listo para sacar."],
+         ["Blanco", "Checked out (Prestado)", "En uso — el nombre de quien lo tiene aparece arriba del cuadro, con la hora de devolución."],
+         ["Rojo + “OVERDUE”", "Overdue (Vencido)", "Pasó el fin de su turno. Búsquelo y devuélvalo ya."],
+         ["Magenta", "Damaged (Dañado)", "Fuera de uso hasta que un supervisor lo revise."],
+         ["Cuadro atenuado", "Out of service", "Retirado de la flota."]],
+        [1.35 * inch, 1.6 * inch, W - 2.95 * inch]))
     s.append(Spacer(1, 10))
     s.append(figure("kiosk-board",
-                    "Los cuchillos #2 y #6 están retirados (anillo amarillo, vencen hoy), el #9 "
-                    "está vencido, el #4 y el #11 esperan saneamiento (naranja) y el #13 está "
-                    "dañado. Los #1–#14 son de contacto con alimentos (plateados); los #51–#78 "
-                    "son sin contacto con alimentos (azules).",
+                    "R2, R6 y S3 están prestados (borde blanco, vencen al fin del turno), R9 "
+                    "está vencido, S7 está dañado y R17 está fuera de servicio.",
                     max_w=6.4 * inch, max_h=3.2 * inch))
     s.append(Spacer(1, 8))
     s.append(P(
-        "Los contadores en la parte superior muestran cuántos cuchillos hay en cada "
-        "estado. Si algo está vencido, un aviso rojo lista esos números de cuchillo. "
-        "Cada ficha muestra además el número del cuchillo y el tipo (FC o NFC) en la "
-        "parte inferior."))
+        "Los conteos en la parte superior muestran cuántos equipos hay en cada estado. Si "
+        "hay alguno vencido, un aviso rojo muestra sus etiquetas."))
 
-    # ---------------- 6. Lista de verificación ----------------
-    s.append(section("6. Saneamiento: lista de verificación de limpieza e inspección", P(
-        "Antes de que un cuchillo usado pueda volver a producción, saneamiento debe "
-        "responder las cuatro preguntas. Cada pregunta aparece en inglés y en español.")))
+    # ---------------- 6 ----------------
+    s.append(section("6. La lista de devolución", P(
+        "Cada devolución hace unas preguntas rápidas, en inglés y en español.")))
     s.append(table(
         [["#", "Pregunta", "Notas"],
-         ["1", "<b>Cleaned?</b> / ¿Limpiado?", "Sí o No."],
-         ["2", "<b>Inspected?</b> / ¿Inspeccionado?", "Sí o No."],
-         ["3", "<b>Condition</b> / Condición", "Good / Bueno — o — Damaged / Dañado."],
-         ["4", "<b>If damaged, why?</b> / ¿Por qué está dañado?", "Obligatoria cuando está Dañado. Se puede adjuntar una <b>foto</b> con la cámara del iPad (opcional pero recomendado)."]],
-        [0.3 * inch, 2.1 * inch, W - 2.4 * inch]))
+         ["1", "<b>¿Lo puso en el cargador?</b> / Placed on the charger?", "Debe ser <b>Sí</b>. Si es No, póngalo en el cargador primero."],
+         ["2", "<b>Condición</b> / Condition", "Bueno / Good — o — Dañado / Damaged."],
+         ["3", "<b>Si está dañado, ¿qué tiene?</b>", "Obligatorio si está Dañado. Se puede agregar una <b>foto</b> con la cámara del iPad (opcional pero recomendado)."]],
+        [0.3 * inch, 2.3 * inch, W - 2.6 * inch]))
     s.append(Spacer(1, 10))
     s.append(figure_row([
-        ("kiosk-checklist", "La lista de verificación mientras saneamiento la responde."),
-        ("kiosk-checklist-damaged", "Al marcar Dañado aparecen el cuadro del motivo y el botón de foto."),
+        ("kiosk-checklist", "La lista de devolución."),
+        ("kiosk-checklist-damaged", "Dañado muestra el cuadro de motivo y el botón de foto."),
     ], max_h=3.7 * inch))
     s.append(Spacer(1, 10))
     s.append(callout(
-        "La regla que el sistema hace cumplir",
-        "Un cuchillo vuelve al servicio <b>solo</b> si se marca como limpiado <b>y</b> "
-        "inspeccionado <b>y</b> su condición es Buena. Si alguna respuesta es No, el "
-        "sistema se niega a devolverlo al servicio."))
+        "La regla que aplica el sistema",
+        "No se puede devolver un equipo hasta que esté en el cargador. Un equipo en buen "
+        "estado vuelve directo a Disponible; uno dañado queda en espera de un supervisor."))
 
-    # ---------------- 7. Dañados ----------------
-    s.append(section("7. Cuchillos dañados — revisión del gerente", P(
-        "Cuando saneamiento marca un cuchillo como <b>Dañado</b>, el cuchillo queda "
-        "retenido fuera de servicio de inmediato. Saneamiento no puede devolverlo y "
-        "nadie puede retirarlo.")))
+    # ---------------- 7 ----------------
+    s.append(section("7. Equipos dañados — revisión del supervisor", P(
+        "Cuando un equipo se devuelve como <b>Dañado</b>, queda fuera de uso de inmediato. "
+        "No se puede sacar hasta que un supervisor lo revise.")))
     s.append(bullets([
-        "El motivo reportado (y la foto, si se tomó) se guarda con el cuchillo.",
-        "Si las alertas de Teams están activadas, se publica un mensaje en el canal de "
-        "inmediato para que un gerente se entere.",
-        "Un <b>gerente (Admin)</b> lo revisa en el tablero de la flota: toque el "
-        "cuchillo, lea <b>Reported damage</b> (daño reportado), vea la foto y elija "
-        "<b>Return to service (manager)</b> (devolver al servicio) o "
-        "<b>Retire (out of service)</b> (retirar del servicio).",
+        "El motivo reportado (y la foto, si se tomó) se guarda con el equipo.",
+        "Si las alertas de Teams están activas, se publica un mensaje en el canal al instante.",
+        "Un <b>supervisor</b> lo revisa en el tablero: toca el equipo, lee "
+        "<b>Reported damage</b>, ve la foto y elige "
+        "<b>Return to service (supervisor)</b> o <b>Retire (out of service)</b>.",
     ]))
     s.append(figure("board-damaged",
-                    "Lo que ve el gerente: el motivo reportado, la foto y las dos decisiones "
+                    "Lo que ve el supervisor: el motivo reportado, la foto y las decisiones "
                     "disponibles.", max_w=3.4 * inch, max_h=4.2 * inch))
 
-    # ---------------- 8. Tareas del gerente ----------------
-    s.append(section("8. Tareas del gerente en el tablero de la flota", P(
-        "El tablero de la flota en <b>/</b> es para administradores y QA. Inicie sesión "
-        "con su PIN. Toque cualquier cuchillo para abrir su panel de acciones.")))
+    # ---------------- 8 ----------------
+    s.append(section("8. Tareas del supervisor en el tablero", P(
+        "El tablero en <b>/</b> es para supervisores y administradores. Inicie sesión con su "
+        "PIN y toque cualquier equipo para ver sus acciones.")))
     s.append(table(
-        [["Acción", "Quién", "Cuándo aparece"],
-         ["Check out / Return (retirar / marcar usado)", "Operador (incluye administradores)", "Las mismas acciones del ciclo de vida que en el quiosco."],
-         ["Clean &amp; return to service (limpiar y devolver al servicio)", "Saneamiento (incluye administradores)", "El cuchillo espera saneamiento."],
-         ["<b>Return to service (manager)</b>", "QA, Gerente o Admin", "El cuchillo está Dañado — borra la nota de daño y la foto."],
-         ["Retire (out of service) (retirar del servicio)", "Admin / QA", "Cualquier cuchillo no retirado aún. Para cuchillos perdidos o rotos."],
-         ["Restore to fleet (restaurar a la flota)", "Admin / QA", "El cuchillo está fuera de servicio."],
-         ["Change knife type (cambiar tipo FC / NFC)", "Admin / QA", "Siempre — cambia las fechas de devolución futuras. Queda registrado. <i>No disponible para gerentes.</i>"],
-         ["View full history (ver historial completo)", "Admin / QA", "Abre el registro completo del ciclo de vida de ese cuchillo."]],
-        [2.2 * inch, 1.45 * inch, W - 3.65 * inch]))
+        [["Acción", "Cuándo aparece"],
+         ["Check out / Check in (return)", "Las mismas acciones del kiosco; la devolución usa la misma lista. Un supervisor puede devolver un equipo que otra persona dejó."],
+         ["<b>Return to service (supervisor)</b>", "El equipo está Dañado — borra la nota y la foto del daño."],
+         ["Retire (out of service)", "Cualquier equipo no retirado. Para equipos perdidos, rotos o en reparación."],
+         ["Restore to fleet", "El equipo está fuera de servicio."],
+         ["View full history", "Abre el historial completo del equipo."]],
+        [2.2 * inch, W - 2.2 * inch]))
     s.append(Spacer(1, 10))
     s.append(figure("board-fleet",
-                    "El tablero de la flota. Filtros en la parte superior; toque cualquier "
-                    "cuchillo para actuar sobre él.",
-                    max_w=6.4 * inch, max_h=3.3 * inch))
-    s.append(Spacer(1, 8))
-    s.append(P(
-        "Use los filtros sobre la cuadrícula para mostrar un solo estado. Al ver "
-        "<b>Awaiting sanitation</b> (esperando saneamiento), el personal de saneamiento "
-        "y los administradores tienen un botón <b>Select multiple</b> para limpiar "
-        "varios cuchillos a la vez."))
+                    "El tablero. Filtros arriba; toque cualquier equipo para actuar.",
+                    max_w=6.4 * inch, max_h=3.6 * inch))
 
-    # ---------------- 9. Reportes ----------------
+    # ---------------- 9 ----------------
     s.append(section("9. Reportes", P(
-        "<b>/reports</b> (administradores y QA) responde las preguntas del fin del turno.")))
+        "<b>/reports</b> responde las preguntas del fin de turno.")))
     s.append(table(
-        [["Panel", "Qué le dice"],
-         ["Still checked out (aún retirados)", "Cuántos cuchillos están fuera ahora mismo y cuántos están vencidos."],
-         ["Total checkouts (retiros totales)", "Conteo de uso acumulado."],
-         ["Avg turnaround (tiempo promedio)", "Tiempo promedio desde que un cuchillo se devuelve hasta que queda limpio y de vuelta en servicio."],
-         ["Cleanings (limpiezas)", "Número total de ciclos de limpieza registrados."],
-         ["End-of-day sweep (barrido de fin de día)", "Una tabla con cada cuchillo aún fuera — quién lo tiene, desde cuándo, cuándo vence y si está vencido. <b>Revise esta lista antes del cierre del turno.</b>"],
-         ["Most-used knives (cuchillos más usados)", "Las hojas de mayor uso — útil para detectar desgaste."]],
-        [1.9 * inch, W - 1.9 * inch]))
+        [["Panel", "Qué indica"],
+         ["Still checked out", "Cuántos equipos están prestados ahora y cuántos están vencidos."],
+         ["Total checkouts", "Total de préstamos registrados."],
+         ["Avg time out", "Tiempo promedio entre sacar y devolver un equipo."],
+         ["Damage reports", "Cuántas devoluciones se marcaron como Dañado."],
+         ["End-of-shift sweep", "Cada equipo que sigue afuera — quién lo tiene, desde cuándo, cuándo vence y si está vencido. <b>Revise esta lista antes del cierre del turno.</b>"],
+         ["Most-used devices", "Los equipos más usados — útil para detectar baterías desgastadas."]],
+        [1.5 * inch, W - 1.5 * inch]))
     s.append(Spacer(1, 10))
-    s.append(figure("reports", "La página de Reportes, incluido el barrido de fin de día.",
+    s.append(figure("reports", "La página de Reportes, con la revisión de fin de turno.",
                     max_w=6.0 * inch, max_h=4.0 * inch))
 
-    # ---------------- 10. Avanzado ----------------
-    s.append(section("10. Avanzado: cada configuración de administración y qué hace", P(
-        "El panel de Administración está en <b>/admin</b>, abierto a administradores, QA y "
-        "gerentes. Si ya inició sesión en el tablero de la flota, no se pide un segundo "
-        "PIN. El encabezado tiene un interruptor de <b>modo claro/oscuro</b> y un enlace "
-        "de regreso a la flota.")))
+    # ---------------- 10 ----------------
+    s.append(section("10. Configuración de Admin y qué hace cada opción", P(
+        "El panel de Admin está en <b>/admin</b>, abierto a supervisores y administradores. "
+        "Si ya inició sesión en el tablero, no necesita otro PIN.")))
     s.append(callout(
-        "Qué ve un gerente aquí",
-        "Un gerente abre la misma página pero en modo de <b>solo lectura</b>: la lista "
-        "de la <b>flota de cuchillos</b> (Knife fleet) y el <b>registro de auditoría</b> "
-        "(con su exportación a CSV). Add a knife, Workers y Advanced están ocultos, y "
-        "los cuchillos no tienen botones Edit ni Remove. Todo lo que sigue en esta "
-        "sección es, por lo tanto, <b>solo para admin/QA</b>. Los gerentes siguen "
-        "haciendo todas las acciones de piso desde el tablero de la flota y el quiosco.", BLUE))
-    s.append(Spacer(1, 8))
-    s.append(callout(
-        "Qué ve QA aquí",
-        "QA gestiona los <b>cuchillos</b> (agregar, editar, eliminar, cambiar el tipo), el "
-        "<b>logotipo del quiosco</b> y el <b>registro de auditoría</b>, y puede devolver "
-        "cuchillos dañados al servicio. <b>Workers</b> y la configuración de "
+        "Lo que ve un supervisor aquí",
+        "Los supervisores administran <b>equipos</b>, <b>horarios de fin de turno</b>, el "
+        "<b>logo del kiosco</b> y ven el <b>registro de auditoría</b>. <b>Workers</b> y las "
         "<b>notificaciones de Teams</b> están ocultos — son solo para administradores.", BLUE))
-    s.append(Spacer(1, 10))
-    s.append(figure("admin-manager",
-                    "La página de administración como la ve un gerente: la flota de cuchillos "
-                    "(solo lectura) y el registro de auditoría — sin Add a knife, Workers ni "
-                    "Advanced.",
-                    max_w=6.2 * inch, max_h=3.6 * inch))
 
-    s.append(P("Knives (cuchillos)", "h2"))
+    s.append(P("Radios &amp; scanners", "h2"))
     s.append(table(
-        [["Configuración", "Qué hace"],
-         ["<b>Add a knife</b> (agregar cuchillo)", "Agrega un cuchillo nuevo a la flota por número, con su tipo (contacto con alimentos o sin contacto). Entra como Disponible. Los números deben ser únicos."],
-         ["Lista <b>Knife fleet</b> (flota)", "Cada cuchillo con su tipo y estado actual."],
-         ["Búsqueda (cuchillos)", "Filtra la lista por número, tipo (FC/NFC o el nombre completo) o estado (p. ej. “awaiting sanitation”)."],
-         ["<b>Edit</b> (por cuchillo)", "Cambia el número o el tipo de un cuchillo. Queda registrado en la auditoría."],
-         ["<b>Remove</b> (por cuchillo)", "<b>Elimina permanentemente</b> el cuchillo y su historial. Pensado para un cuchillo agregado por error. Bloqueado mientras el cuchillo esté retirado. Para sacar un cuchillo real de la rotación <b>conservando</b> su historial, use <b>Retire</b> en el tablero."]],
-        [1.85 * inch, W - 1.85 * inch]))
+        [["Opción", "Qué hace"],
+         ["<b>Add a device</b>", "Elija Radio o Scanner y escriba una etiqueta (R21, S21) o solo un número — un número solo recibe la letra del tipo. Los equipos nuevos entran como Disponibles. Las etiquetas deben ser únicas."],
+         ["<b>Device list</b>", "Cada equipo con su tipo y estado actual. Busque por etiqueta, tipo o estado."],
+         ["<b>Edit</b>", "Cambia la etiqueta o el tipo de un equipo. Queda en el registro."],
+         ["<b>Remove</b>", "<b>Borra permanentemente</b> el equipo y su historial. Para equipos agregados por error. Para sacar de rotación un equipo real y <b>conservar</b> su historial, use <b>Retire</b> en el tablero."]],
+        [1.45 * inch, W - 1.45 * inch]))
     s.append(Spacer(1, 10))
-    s.append(figure("admin-knives", "Admin - Knives (cuchillos).", max_w=4.2 * inch, max_h=3.6 * inch))
+    s.append(figure("admin-devices", "Admin - Radios &amp; scanners.", max_w=4.2 * inch, max_h=3.6 * inch))
 
-    s.append(P("Workers (empleados) &mdash; solo admin", "h2"))
+    s.append(P("Workers &mdash; solo administradores", "h2"))
     s.append(table(
-        [["Configuración", "Qué hace"],
-         ["<b>Add a worker</b> (agregar empleado)", "Crea un empleado: nombre, PIN (4–8 dígitos, debe ser único) y uno o más roles."],
-         ["<b>Bulk upload (CSV)</b> (carga masiva)", "Agrega muchos empleados a la vez desde un CSV con columnas <b>name,pin,roles</b> (roles separados por <b>;</b> — p. ej. OPERATOR;SANITATION). Las filas con PIN duplicado o inválido se omiten y se reportan."],
-         ["<b>Download sample CSV</b>", "Un archivo de ejemplo con el formato correcto para completar."],
-         ["Lista <b>Employees</b> (empleados)", "Todos los empleados, ordenados por rol: Admin, QA, Operador, Saneamiento."],
-         ["Búsqueda (empleados)", "Filtra la lista por nombre o rol."],
-         ["<b>Export employees (CSV)</b>", "Descarga nombre, roles y estado activo. Los PINs están cifrados y no pueden exportarse."],
-         ["<b>Edit</b> (por empleado)", "Cambia su nombre, sus roles o asigna un PIN nuevo (deje el PIN en blanco para conservar el actual)."],
-         ["<b>Deactivate</b> / Reactivate", "Revoca o restaura el acceso <b>conservando</b> el historial de la persona. Úselo cuando alguien se va."],
-         ["<b>Remove</b> (por empleado)", "Elimina el registro del empleado por completo. Prefiera Deactivate para conservar la auditoría."]],
-        [1.85 * inch, W - 1.85 * inch]))
+        [["Opción", "Qué hace"],
+         ["<b>Add a worker</b>", "Crea un empleado: nombre, PIN (4–8 dígitos, único) y rol (Operator, Supervisor, Admin)."],
+         ["<b>Bulk upload (CSV)</b>", "Agrega muchos empleados a la vez desde un CSV con columnas <b>name,pin,roles</b>. Las filas con PIN repetido o inválido se omiten y se reportan."],
+         ["<b>Employees</b>", "Todos los empleados, ordenados por rol. Edite nombre, roles o PIN; <b>Deactivate</b> quita el acceso pero conserva el historial; <b>Remove</b> lo borra por completo."],
+         ["<b>Export employees (CSV)</b>", "Descarga nombre, roles y estado. Los PIN están cifrados y no se exportan."]],
+        [1.45 * inch, W - 1.45 * inch]))
     s.append(Spacer(1, 10))
-    s.append(figure("admin-workers", "Admin - Workers (empleados).", max_w=4.2 * inch, max_h=3.8 * inch))
+    s.append(figure("admin-workers", "Admin - Workers.", max_w=4.2 * inch, max_h=3.8 * inch))
 
-    s.append(P("Sección Advanced (contraída de forma predeterminada)", "h2"))
-    s.append(P(
-        "Haga clic en <b>Advanced</b> para expandirla. Son configuraciones de "
-        "instalación — rara vez necesitará cambiarlas en el día a día."))
-    s.append(P("<b>Notificaciones de Microsoft Teams</b> &mdash; solo admin", "body"))
+    s.append(P("Sección Advanced (cerrada por defecto)", "h2"))
     s.append(table(
-        [["Configuración", "Qué hace"],
-         ["<b>Webhook URL</b>", "Adónde se publican las alertas. Créela en Teams: canal &gt; <b>menú “...”</b> &gt; <b>Workflows</b> → “Post to a channel when a webhook request is received”, y pegue la URL que genera (contiene <i>logic.azure.com</i>). Las URLs del conector antiguo “Incoming Webhook” también funcionan."],
-         ["<b>Enable Teams notifications</b>", "Interruptor general. No se envía nada mientras esté apagado."],
-         ["Notificar: <b>cuchillo marcado como dañado</b>", "Publica en el momento en que saneamiento reporta un daño, para que un gerente pueda revisarlo. <i>Activado de forma predeterminada.</i>"],
-         ["Notificar: <b>cuchillo vencido</b>", "Pensado para el barrido de vencidos al final del día. Requiere una tarea programada que ejecute el barrido; la preferencia queda guardada y lista."],
-         ["Notificar: <b>cuchillo retirado</b>", "Publica cada retiro, con la hora de devolución. <i>Desactivado de forma predeterminada.</i>"],
-         ["Notificar: <b>cuchillo devuelto</b>", "Publica cada devolución. <i>Desactivado de forma predeterminada.</i>"],
-         ["Notificar: <b>limpiado y devuelto al servicio</b>", "Publica cada limpieza completada. <i>Desactivado de forma predeterminada.</i>"],
-         ["<b>Save</b> (guardar)", "Guarda la configuración. Si las notificaciones están activadas, se requiere una URL https válida y al menos un tipo de alerta."],
-         ["<b>Send test message</b> (enviar prueba)", "Publica una línea de prueba en el canal para confirmar la conexión antes de depender de ella. Los errores informan exactamente lo que Teams respondió."]],
-        [1.85 * inch, W - 1.85 * inch]))
+        [["Opción", "Qué hace"],
+         ["<b>Microsoft Teams notifications</b> (solo admin)", "Pegue la URL de un webhook de Workflows de Teams (canal → “...” → Workflows → “Post to a channel when a webhook request is received”) y elija las alertas: devoluciones dañadas (activa por defecto), revisión de vencidos (requiere una tarea programada), préstamos y devoluciones (apagadas por defecto). <b>Send test message</b> confirma la conexión."],
+         ["<b>Shift end times</b>", "Las horas en que vence cada préstamo (formato de 24 horas, separadas por comas). Los cambios aplican solo a préstamos nuevos."],
+         ["<b>Kiosk logo</b>", "Suba el logo de su empresa para la esquina superior izquierda del kiosco (PNG, JPG o SVG de menos de 500 KB). <b>Remove logo</b> vuelve al ícono de radio."],
+         ["<b>System</b> (solo lectura)", "La zona horaria y la hora del servidor. Todas las horas de devolución siguen este reloj — configure la variable <b>TZ</b> si está mal."]],
+        [1.7 * inch, W - 1.7 * inch]))
     s.append(Spacer(1, 8))
-    s.append(figure("admin-advanced",
-                    "Admin - Advanced, expandido: notificaciones de Teams, logotipo del quiosco "
-                    "y zona horaria del sistema.", max_w=6.0 * inch, max_h=4.2 * inch))
-    s.append(Spacer(1, 6))
+    s.append(figure("admin-advanced", "Admin - Advanced, abierto.", max_w=6.0 * inch, max_h=4.2 * inch))
+
+    s.append(P("Recent activity (registro de auditoría)", "h2"))
     s.append(P(
-        "<i>Las alertas por acción (retiro / devolución / limpieza) generan mucho ruido "
-        "en un piso ocupado — por eso comienzan desactivadas.</i>", "small"))
+        "Las acciones más recientes — cuándo, qué equipo, qué pasó, quién lo hizo y cualquier "
+        "nota (incluidas las respuestas de la lista de devolución). <b>Export full log (CSV)</b> "
+        "descarga el historial completo. Los registros nunca se editan ni se borran."))
 
-    s.append(Spacer(1, 10))
-    s.append(P("<b>Kiosk logo (logotipo del quiosco)</b>", "body"))
-    s.append(table(
-        [["Configuración", "Qué hace"],
-         ["<b>Choose File</b> (elegir archivo)", "Sube el logotipo de su empresa, que se muestra en la esquina superior izquierda del tablero del quiosco. PNG, JPG o SVG de menos de 500 KB."],
-         ["<b>Remove logo</b> (quitar logotipo)", "Lo elimina; el quiosco vuelve a mostrar el ícono del cuchillo."]],
-        [1.85 * inch, W - 1.85 * inch]))
-
-    s.append(Spacer(1, 10))
-    s.append(P("<b>System (sistema)</b> (solo lectura)", "body"))
-    s.append(table(
-        [["Lectura", "Qué significa"],
-         ["<b>Timezone</b> (zona horaria)", "La zona horaria en la que se calculan todas las fechas de devolución — “fin del día” y “fin del viernes” siguen este reloj. Se define con la variable de entorno <b>TZ</b> en el servidor (p. ej. America/New_York). Si está mal, las horas de devolución estarán mal."],
-         ["<b>Server time now</b> (hora del servidor)", "La hora actual del sistema en esa zona horaria. Compárela con un reloj en la pared para confirmar que la configuración es correcta."]],
-        [1.85 * inch, W - 1.85 * inch]))
-    s.append(Spacer(1, 6))
-    s.append(P(
-        "<i>Las horas de devolución se muestran en la zona horaria del dispositivo desde "
-        "el que mira. Mantenga el iPad del quiosco en la zona horaria de la planta para "
-        "que lo que ve el piso coincida con lo que registró el servidor.</i>", "small"))
-
-    s.append(Spacer(1, 10))
-    s.append(P("<b>Recent activity (registro de auditoría)</b>", "body"))
-    s.append(table(
-        [["Configuración", "Qué hace"],
-         ["Tabla de actividad", "Las acciones más recientes: cuándo, qué cuchillo, qué pasó, quién lo hizo y cualquier nota (incluidas las respuestas de saneamiento)."],
-         ["<b>Export full log (CSV)</b>", "Descarga el historial de auditoría <b>completo</b> para auditorías de seguridad alimentaria o una investigación de retiro de producto. Los registros nunca se editan ni se eliminan."]],
-        [1.85 * inch, W - 1.85 * inch]))
-
-    # ---------------- 11. Solución de problemas ----------------
+    # ---------------- 11 ----------------
     s.append(P("11. Solución de problemas", "h1"))
     s.append(table(
         [["Síntoma", "Causa y solución"],
-         ["“PIN not recognized.” (PIN no reconocido)", "PIN incorrecto, o el empleado está desactivado. Un gerente puede asignar un PIN nuevo en Admin → Workers."],
-         ["“This action requires the SANITATION role.”", "El PIN ingresado no tiene el rol que esa acción necesita — p. ej. un operador intentando limpiar. Use el PIN de la persona correcta, o pida a un gerente que agregue el rol."],
-         ["El cuchillo fue retirado por otra persona", "Solo la persona que tiene un cuchillo (o un gerente) puede devolverlo. Un gerente puede devolverlo desde el tablero de la flota."],
-         ["Un cuchillo no se puede retirar", "No está Disponible — está esperando saneamiento, dañado o retirado. Guíese por el color del anillo."],
-         ["Las fechas de devolución están corridas por horas", "La zona horaria del servidor está mal. Revise Admin → Advanced → System y configure la variable de entorno <b>TZ</b>."],
-         ["La prueba de Teams dice HTTP 405", "La URL pegada no es un webhook (suele ser un enlace al canal). Cree un webhook de Workflows como se describe en la sección 10."],
-         ["Teams no publica nada", "Verifique que <b>Enable Teams notifications</b> esté activado y que haya al menos un tipo de alerta marcado; luego use <b>Send test message</b>."],
-         ["El quiosco muestra información vieja", "El tablero se actualiza solo cada pocos segundos; si parece congelado, recargue la página en el iPad."]],
-        [2.1 * inch, W - 2.1 * inch]))
+         ["“PIN not recognized.”", "PIN incorrecto, o el empleado está desactivado. Un administrador puede asignar un PIN nuevo en Admin → Workers."],
+         ["“…checked out by someone else”", "Solo quien tiene el equipo (o un supervisor) puede devolverlo. Póngalo en el cargador y pida a un supervisor que lo devuelva."],
+         ["Submit sigue gris al devolver", "Conteste <b>Sí</b> a “¿Lo puso en el cargador?” y elija una condición. Dañado también requiere un motivo."],
+         ["No se puede sacar un equipo", "No está Disponible — está prestado, dañado o retirado. Fíjese en el color del borde."],
+         ["Las horas de devolución están mal", "Revise los horarios de fin de turno y la zona horaria en Admin → Advanced, y la variable <b>TZ</b>."],
+         ["La prueba de Teams dice HTTP 405", "La URL no es un webhook (normalmente es un enlace al canal). Cree un webhook de Workflows como se explica en la sección 10."],
+         ["El kiosco muestra información vieja", "El tablero se actualiza solo cada pocos segundos; si parece detenido, recargue la página en el iPad."]],
+        [1.9 * inch, W - 1.9 * inch]))
 
     s.append(Spacer(1, 16))
     s.append(callout(
-        "El ritmo diario — la versión corta",
-        "Los operadores retiran y devuelven cuchillos en el quiosco. Saneamiento limpia "
-        "e inspecciona todo lo naranja. Antes del cierre del turno, un gerente abre "
-        "<b>Reports → End-of-day sweep</b> y persigue todo lo que siga fuera. Los "
-        "cuchillos dañados esperan a un gerente.", BLUE))
+        "Rutina diaria — la versión corta",
+        "Los operadores sacan radios y escáneres al inicio del turno y los devuelven, en el "
+        "cargador, al final. Antes del cierre del turno, un supervisor abre "
+        "<b>Reports → End-of-shift sweep</b> y busca lo que sigue afuera. Los equipos dañados "
+        "esperan a un supervisor.", BLUE))
 
     doc.build(s)
     print(f"wrote {OUT}")
