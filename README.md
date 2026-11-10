@@ -84,6 +84,21 @@ incoming shift isn't marked overdue the moment they pick up a radio.
   times, kiosk logo, **Teams alerts**, and export the full audit log to CSV.
 - **`/device/<label>`** — a single device's complete history.
 
+## Embedding in monday.com (or another dashboard)
+
+The app can run inside a frame on another site, such as a command ops board on monday.com.
+
+- **Who may frame it:** `next.config.mjs` sends `Content-Security-Policy: frame-ancestors`
+  allowing this app plus `https://monday.com`, `https://*.monday.com`, and
+  `https://*.monday.app`. To allow other sites, set **`EMBED_ORIGINS`** (space- or
+  comma-separated, replaces the default list) and redeploy — the header is fixed at build time.
+- **Sign-in inside the frame:** the session cookies are `SameSite=None; Secure; Partitioned`,
+  so the PIN sign-in for the fleet board, reports, and admin works inside the frame in
+  Chrome, Edge, and the monday desktop app, even with third-party cookies blocked.
+- **The kiosk needs no cookies** — every kiosk action is confirmed by PIN — so `/kiosk`
+  embeds in any browser. Safari (including iPad) blocks cookies in cross-site frames, so for
+  the fleet board/admin on Safari, open the app in its own tab.
+
 ## Tech stack
 
 - **Next.js (App Router, TypeScript)** — single deployable full-stack app
