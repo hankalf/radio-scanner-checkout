@@ -98,7 +98,7 @@ function DevicesCard({ devices }: { devices: DeviceRow[] }) {
 function DeviceFleetSection({ devices, readOnly }: { devices: DeviceRow[]; readOnly?: boolean }) {
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
-  // Match the label (R7, S12, or just the number), the type, or the status
+  // Match the label (R007, S012, or just the number), the type, or the status
   // label shown on the row.
   const visible = q
     ? devices.filter((k) => {
@@ -230,7 +230,7 @@ function DeviceRowItem({ device, readOnly }: { device: DeviceRow; readOnly?: boo
         <input
           value={number}
           onChange={(e) => setNumber(e.target.value)}
-          placeholder="Label (e.g. R7)"
+          placeholder="Label (e.g. R007)"
           className={INPUT}
         />
         <div className="flex gap-2">
@@ -458,13 +458,13 @@ function AddDeviceSection() {
       <h3 className="font-semibold mb-1">Add a device</h3>
       <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
         New devices enter the fleet as Available. A bare number gets the type&apos;s letter
-        (21 → R21 or S21).
+        (21 → R021 or S021).
       </p>
       <div className="flex gap-2 mb-2">
         <input
           value={number}
           onChange={(e) => setNumber(e.target.value)}
-          placeholder={`Label (e.g. ${TYPE_META[type].prefix}21)`}
+          placeholder={`Label (e.g. ${TYPE_META[type].prefix}021)`}
           className={`flex-1 ${INPUT}`}
         />
         <button

@@ -21,7 +21,7 @@ test("due time is the next shift end", () => {
 });
 
 test("kiosk checkout stamps the next shift end", async ({ page }) => {
-  const N = "R18";
+  const N = "R018";
   await resetDevice(N);
   const before = new Date();
   await kioskStart(page, N, PIN.operator, /Yes, that's me/);

@@ -313,8 +313,8 @@ def build():
         "out on, on its charger. The due time is set automatically at checkout.")))
     s.append(table(
         [["Device", "Kiosk color", "Labels", "Must be returned"],
-         ["<b>Radio</b>", "Blue tile", "R1–R20", "End of shift, on the charger."],
-         ["<b>Scanner</b>", "Amber tile", "S1–S20", "End of shift, on the charger."]],
+         ["<b>Radio</b>", "Blue tile", "R001–R020", "End of shift, on the charger."],
+         ["<b>Scanner</b>", "Amber tile", "S001–S020", "End of shift, on the charger."]],
         [1.1 * inch, 1.1 * inch, 1.0 * inch, W - 3.2 * inch]))
     s.append(Spacer(1, 8))
     s.append(P(
@@ -371,8 +371,8 @@ def build():
         [1.35 * inch, 1.6 * inch, W - 2.95 * inch]))
     s.append(Spacer(1, 10))
     s.append(figure("kiosk-board",
-                    "R2, R6, and S3 are checked out (white ring, due at end of shift), R9 is "
-                    "overdue, S7 is damaged, and R17 is out of service.",
+                    "R002, R006, and S003 are checked out (white ring, due at end of shift), R009 is "
+                    "overdue, S007 is damaged, and R017 is out of service.",
                     max_w=6.4 * inch, max_h=3.2 * inch))
     s.append(Spacer(1, 8))
     s.append(P(
@@ -460,7 +460,7 @@ def build():
     s.append(P("Radios &amp; scanners", "h2"))
     s.append(table(
         [["Setting", "What it does"],
-         ["<b>Add a device</b>", "Pick Radio or Scanner and type a label (R21, S21) or just a number — a bare number gets the type's letter. New devices enter as Available. Labels must be unique."],
+         ["<b>Add a device</b>", "Pick Radio or Scanner and type a label (R021, S021) or just a number — a bare number gets the type's letter. New devices enter as Available. Labels must be unique."],
          ["<b>Device list</b>", "Every device with its type and current status. Search by label, type, or status."],
          ["<b>Edit</b> (per device)", "Change a device's label or type. Logged to the audit trail."],
          ["<b>Remove</b> (per device)", "<b>Permanently deletes</b> the device and its history. Intended for one added by mistake. To take a real device out of rotation and <b>keep</b> its history, use <b>Retire</b> on the board instead."]],

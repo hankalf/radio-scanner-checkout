@@ -34,13 +34,13 @@ service from the fleet board.
 
 ### Device types & labels
 
-The seed creates **20 radios (R1–R20)** and **20 scanners (S1–S20)**. Tiles are **filled by
+The seed creates **20 radios (R001–R020)** and **20 scanners (S001–S020)**. Tiles are **filled by
 type** — blue for radios, amber for scanners — and **ringed by status**: green available,
 white checked out, red overdue, magenta damaged, dimmed out of service. A checked-out tile
 also shows **who has it** (first name + last initial) and **when it's due back**.
 
 Add, relabel, or remove devices in **Admin**. Typing a bare number when adding a device gives
-it the type's letter (`21` → `R21` or `S21`). The seed only runs into an empty fleet, so
+it the type's letter (`21` → `R021` or `S021`). The seed only runs into an empty fleet, so
 devices you remove or relabel are never re-created on the next deploy.
 
 ### Due times (end of shift)
@@ -98,7 +98,7 @@ docker run -d --name device-db \
   -p 5432:5432 postgres:16       # or use your own Postgres + set DATABASE_URL in .env
 npm install
 npm run db:migrate               # apply migrations (creates the tables)
-npm run db:seed                  # seed R1–R20, S1–S20 + starter workers
+npm run db:seed                  # seed R001–R020, S001–S020 + starter workers
 npm run dev                      # http://localhost:3000
 ```
 

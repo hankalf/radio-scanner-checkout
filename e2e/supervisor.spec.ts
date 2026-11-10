@@ -30,7 +30,7 @@ test("a supervisor manages devices but not employees or Teams", async ({ page })
 });
 
 test("a supervisor can check out, return, and retire from the board", async ({ page }) => {
-  const N = "S18";
+  const N = "S018";
   await resetDevice(N);
   await signIn(page, PIN.supervisor);
 
@@ -53,8 +53,8 @@ test("a supervisor can check out, return, and retire from the board", async ({ p
 });
 
 async function removeS99() {
-  await prisma.deviceEvent.deleteMany({ where: { device: { number: "S99" } } });
-  await prisma.device.deleteMany({ where: { number: "S99" } });
+  await prisma.deviceEvent.deleteMany({ where: { device: { number: "S099" } } });
+  await prisma.device.deleteMany({ where: { number: "S099" } });
 }
 
 test("an admin can add a scanner with a bare number", async ({ page }) => {
@@ -62,10 +62,10 @@ test("an admin can add a scanner with a bare number", async ({ page }) => {
   await signIn(page, PIN.admin);
   await page.goto("/admin");
   await page.getByRole("button", { name: "Scanner", exact: true }).first().click();
-  await page.getByPlaceholder(/Label \(e\.g\. S21\)/).fill("99");
+  await page.getByPlaceholder(/Label \(e\.g\. S021\)/).fill("99");
   await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect
-    .poll(async () => (await prisma.device.findFirst({ where: { number: "S99" } }))?.type)
+    .poll(async () => (await prisma.device.findFirst({ where: { number: "S099" } }))?.type)
     .toBe("SCANNER");
   await removeS99();
 });

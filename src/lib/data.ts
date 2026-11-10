@@ -52,7 +52,7 @@ export async function getShiftEnds(): Promise<number[]> {
   return parseShiftEnds(s?.value ?? DEFAULT_SHIFT_ENDS);
 }
 
-// Radios first, then scanners, each in label order (R1, R2 … S1, S2 …).
+// Radios first, then scanners, each in label order (R001, R002 … S001, S002 …).
 export async function getDevices() {
   return prisma.device.findMany({
     orderBy: [{ type: "asc" }, { sortKey: "asc" }, { number: "asc" }],

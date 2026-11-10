@@ -19,7 +19,7 @@ export type DeviceType = (typeof DEVICE_TYPE)[keyof typeof DEVICE_TYPE];
 
 // Radios are blue tiles, scanners are amber — two colors that stay distinct
 // from each other and from the status rings under warehouse lighting.
-// `prefix` is the label letter new devices of that type get (R7, S12).
+// `prefix` is the label letter new devices of that type get (R007, S012).
 export const TYPE_META: Record<
   DeviceType,
   { label: string; labelEs: string; short: string; prefix: string; tile: string; badge: string; dot: string }
@@ -203,7 +203,12 @@ export const ACTION_LABEL: Record<string, string> = {
   EDIT: "Edited",
 };
 
-// Parse a device label like "R7", "s-12" or "7" into its canonical form.
+// Asset-tag style label: letter + at least three digits (R007, S120).
+export function formatDeviceLabel(prefix: string, n: number): string {
+  return `${prefix}${String(n).padStart(3, "0")}`;
+}
+
+// Parse a device label like "R007", "s-12" or "7" into its canonical form.
 // A bare number gets the type's prefix. Returns null when it isn't a label.
 export function parseDeviceLabel(
   input: string,
@@ -213,5 +218,5 @@ export function parseDeviceLabel(
   if (!m) return null;
   const prefix = (m[1] || TYPE_META[type].prefix).toUpperCase();
   const n = Number(m[2]);
-  return { number: `${prefix}${n}`, sortKey: n };
+  return { number: formatDeviceLabel(prefix, n), sortKey: n };
 }

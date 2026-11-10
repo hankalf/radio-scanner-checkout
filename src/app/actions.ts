@@ -523,7 +523,7 @@ export async function addDevice(label: string, type: string = "RADIO"): Promise<
   if (!auth.ok) return fail(auth.error);
   const deviceType = normalizeType(type);
   const parsed = parseDeviceLabel(label, deviceType);
-  if (!parsed) return fail("Use a label like R21 or S21 (or just a number).");
+  if (!parsed) return fail("Use a label like R021 or S021 (or just a number).");
 
   const existing = await prisma.device.findUnique({ where: { number: parsed.number } });
   if (existing) return fail(`${parsed.number} already exists.`);
@@ -560,7 +560,7 @@ export async function updateDeviceDetails(
   if (!auth.ok) return fail(auth.error);
   const deviceType = normalizeType(input.type);
   const parsed = parseDeviceLabel(input.number, deviceType);
-  if (!parsed) return fail("Use a label like R21 or S21 (or just a number).");
+  if (!parsed) return fail("Use a label like R021 or S021 (or just a number).");
 
   try {
     await prisma.$transaction(async (tx) => {

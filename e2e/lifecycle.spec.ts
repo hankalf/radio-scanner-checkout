@@ -8,7 +8,7 @@ test.afterAll(async () => {
 // One operator round-trip on the kiosk: AVAILABLE → CHECKED_OUT → AVAILABLE,
 // with the "on charger + Good" return checklist.
 test("kiosk lifecycle: checkout, holder shown, return good", async ({ page }) => {
-  const N = "R20";
+  const N = "R020";
   await resetDevice(N);
 
   await kioskStart(page, N, PIN.operator, /Yes, that's me/);
@@ -29,7 +29,7 @@ test("kiosk lifecycle: checkout, holder shown, return good", async ({ page }) =>
 
 // The checklist won't submit until the device is on its charger.
 test("return requires the device on the charger", async ({ page }) => {
-  const N = "S20";
+  const N = "S020";
   await resetDevice(N);
   await kioskStart(page, N, PIN.operator, /Yes, that's me/);
   await expect.poll(() => statusOf(N)).toBe("CHECKED_OUT");
@@ -45,7 +45,7 @@ test("return requires the device on the charger", async ({ page }) => {
 
 // Someone else's device can't be returned by another operator.
 test("only the holder (or a supervisor) can return a device", async ({ page }) => {
-  const N = "R19";
+  const N = "R019";
   await resetDevice(N);
   const { hashPin } = await import("../src/lib/crypto");
   await prisma.worker.deleteMany({ where: { name: "Other Operator" } });
@@ -69,7 +69,7 @@ test("only the holder (or a supervisor) can return a device", async ({ page }) =
 // The damaged path: an operator returns it damaged, the device is held, and
 // a supervisor returns it to service from the board.
 test("damaged device requires a supervisor to return", async ({ page }) => {
-  const N = "S19";
+  const N = "S019";
   await resetDevice(N);
 
   await kioskStart(page, N, PIN.operator, /Yes, that's me/);

@@ -12,8 +12,8 @@ test("kiosk is open, bilingual, and shows all 40 devices", async ({ page }) => {
   ).toBeVisible();
   // Spanish instructions are present underneath the English ones.
   await expect(page.getByText(/Toque un radio o escáner/)).toBeVisible();
-  await expect(page.locator('button[title^="R1 —"]')).toBeVisible();
-  await expect(page.locator('button[title^="S20 —"]')).toBeVisible();
+  await expect(page.locator('button[title^="R001 —"]')).toBeVisible();
+  await expect(page.locator('button[title^="S020 —"]')).toBeVisible();
 });
 
 test("the fleet board is gated to supervisors/admins", async ({ page }) => {

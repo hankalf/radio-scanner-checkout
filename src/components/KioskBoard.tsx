@@ -198,9 +198,9 @@ export default function KioskBoard({
                 </span>
               )}
               {/* vmin tracks the viewport, not the tile, so keep the size
-                  conservative: a 3-char label (R20) must fit a 1/10-width
+                  conservative: a 4-char label (R020) must fit a 1/10-width
                   column on the smallest iPad. */}
-              <span className="max-w-full leading-none font-extrabold" style={{ fontSize: "clamp(1rem, 4.2vmin, 3rem)" }}>
+              <span className="max-w-full leading-none font-extrabold" style={{ fontSize: "clamp(0.9rem, 3.5vmin, 2.5rem)" }}>
                 {k.number}
               </span>
               {/* when it's due back */}

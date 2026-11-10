@@ -314,8 +314,8 @@ def build():
         "su cargador. La hora de devolución se asigna automáticamente al sacarlo.")))
     s.append(table(
         [["Equipo", "Color en el kiosco", "Etiquetas", "Se debe devolver"],
-         ["<b>Radio</b>", "Cuadro azul", "R1–R20", "Al final del turno, en el cargador."],
-         ["<b>Escáner</b> (Scanner)", "Cuadro ámbar", "S1–S20", "Al final del turno, en el cargador."]],
+         ["<b>Radio</b>", "Cuadro azul", "R001–R020", "Al final del turno, en el cargador."],
+         ["<b>Escáner</b> (Scanner)", "Cuadro ámbar", "S001–S020", "Al final del turno, en el cargador."]],
         [1.25 * inch, 1.25 * inch, 0.9 * inch, W - 3.4 * inch]))
     s.append(Spacer(1, 8))
     s.append(P(
@@ -372,8 +372,8 @@ def build():
         [1.35 * inch, 1.6 * inch, W - 2.95 * inch]))
     s.append(Spacer(1, 10))
     s.append(figure("kiosk-board",
-                    "R2, R6 y S3 están prestados (borde blanco, vencen al fin del turno), R9 "
-                    "está vencido, S7 está dañado y R17 está fuera de servicio.",
+                    "R002, R006 y S003 están prestados (borde blanco, vencen al fin del turno), R009 "
+                    "está vencido, S007 está dañado y R017 está fuera de servicio.",
                     max_w=6.4 * inch, max_h=3.2 * inch))
     s.append(Spacer(1, 8))
     s.append(P(
@@ -461,7 +461,7 @@ def build():
     s.append(P("Radios &amp; scanners", "h2"))
     s.append(table(
         [["Opción", "Qué hace"],
-         ["<b>Add a device</b>", "Elija Radio o Scanner y escriba una etiqueta (R21, S21) o solo un número — un número solo recibe la letra del tipo. Los equipos nuevos entran como Disponibles. Las etiquetas deben ser únicas."],
+         ["<b>Add a device</b>", "Elija Radio o Scanner y escriba una etiqueta (R021, S021) o solo un número — un número solo recibe la letra del tipo. Los equipos nuevos entran como Disponibles. Las etiquetas deben ser únicas."],
          ["<b>Device list</b>", "Cada equipo con su tipo y estado actual. Busque por etiqueta, tipo o estado."],
          ["<b>Edit</b>", "Cambia la etiqueta o el tipo de un equipo. Queda en el registro."],
          ["<b>Remove</b>", "<b>Borra permanentemente</b> el equipo y su historial. Para equipos agregados por error. Para sacar de rotación un equipo real y <b>conservar</b> su historial, use <b>Retire</b> en el tablero."]],

@@ -54,14 +54,14 @@ async function seedState() {
       where: { number: { in: nums } },
       data: { status: "CHECKED_OUT", checkedOutById: op.id, checkedOutAt: at, dueAt },
     });
-  await out(["R2", "R6", "S3"], shiftEnd);
-  await out(["R9"], overdue, new Date(Date.now() - 9 * 3600e3));
+  await out(["R002", "R006", "S003"], shiftEnd);
+  await out(["R009"], overdue, new Date(Date.now() - 9 * 3600e3));
   await prisma.device.updateMany({
-    where: { number: "S7" },
+    where: { number: "S007" },
     data: { status: "DAMAGED", damageNote: "Screen cracked — scanner won't read labels.",
             damagePhoto: DAMAGE_PHOTO },
   });
-  await prisma.device.updateMany({ where: { number: "R17" }, data: { status: "OUT_OF_SERVICE", retiredAt: new Date() } });
+  await prisma.device.updateMany({ where: { number: "R017" }, data: { status: "OUT_OF_SERVICE", retiredAt: new Date() } });
   return original;
 }
 
@@ -88,7 +88,7 @@ try {
   await shot(k, "kiosk-board");
 
   // Step 1 — PIN pad
-  await k.locator('button[title^="R1 —"]').first().click();
+  await k.locator('button[title^="R001 —"]').first().click();
   await k.waitForTimeout(400);
   const modal = k.locator("div.shadow-xl").first();
   await shot(modal, "kiosk-pin");
@@ -103,7 +103,7 @@ try {
 
   // Step 3 — return checklist, then the damaged branch
   await k.goto(`${BASE}/kiosk`, { waitUntil: "networkidle" });
-  await k.locator('button[title^="R2 —"]').first().click();
+  await k.locator('button[title^="R002 —"]').first().click();
   await k.waitForTimeout(300);
   await enterPin(k, "1111");
   await k.getByRole("button", { name: /Siguiente/ }).click();
@@ -128,7 +128,7 @@ try {
   await shot(a, "board-fleet");
 
   // Damaged device modal — what the supervisor sees
-  await a.locator('button[title*=" S7 —"]').first().click();
+  await a.locator('button[title*=" S007 —"]').first().click();
   await a.waitForTimeout(500);
   await shot(a.locator("div.shadow-xl").first(), "board-damaged");
   await a.mouse.click(5, 5);
